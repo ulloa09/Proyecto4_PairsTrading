@@ -4,6 +4,7 @@ import pandas as pd
 """
 Data Loader – Pairs Trading Project
 Downloads daily prices for multiple tickers and stores them in data/prices.csv
+When calling this file, the download price will start all over again with the selected parameters at the end of the script
 """
 
 def download_price_data(tickers, start_date, end_date):
@@ -40,9 +41,7 @@ def download_price_data(tickers, start_date, end_date):
             # skip ticker with no data
             continue
 
-        if "Adj Close" in df.columns:
-            series = df[["Adj Close"]].rename(columns={"Adj Close": ticker})
-        elif "Close" in df.columns:
+        if "Close" in df.columns:
             series = df[["Close"]].rename(columns={"Close": ticker})
         else:
             # no usable price column, skip
@@ -69,6 +68,8 @@ def download_price_data(tickers, start_date, end_date):
     data.to_csv("data/prices.csv", index=True)
 
     return data
+
+
 
 start_date = '2010-11-01'
 end_date = '2025-11-01'
