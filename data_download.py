@@ -65,7 +65,7 @@ def download_price_data(tickers, start_date, end_date):
     data.rename(columns={'index': 'Date'}, inplace=True)
 
     # save to csv (single file to reuse later)
-    data.to_csv("data/prices.csv", index=True)
+    data.to_csv("data/raw_prices.csv", index=True)
 
     return data
 
