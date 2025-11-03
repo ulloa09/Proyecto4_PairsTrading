@@ -1,12 +1,14 @@
 import pandas as pd
 
+from data.graphs import plot_hedge_ratio
 from kalman_hedge import run_kalman_on_pair
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices
 
-# Reading data CSV
-data = pd.read_csv('data/prices.csv')
+# Pre-processing data
+data = pd.read_csv('data/raw_prices.csv')
 data = clean_prices(data)
+data.to_csv('data/prices.csv')
 print(f"Tickers utilizados:\n{data.columns.values}")
 
 # Encontrar pares correlacionados
@@ -19,11 +21,12 @@ ols_adf_results = ols_and_adf(data, correlated_pairs, save_path=f'data/results_o
 # Run Johansen test (solo para activos con residuos estacionarios)
 johansen_results = run_johansen_test(data, ols_adf_results, save_path=f'data/results_johansen.csv')
 
-# Obtain individual DFs for cointegrated pairs
+# Obtain individual DFs for cointegrated pairs found
 pair1_df = extract_pair(data, johansen_results, index=0)
 pair2_df = extract_pair(data, johansen_results, index=1)
 
-# Kalman Filter 1: Dynamic Hedge Ratio
+# Kalman Filter 1: Dynamic Hedge Ratio (for individual cointegrated pairs found)
 kalman1_pair1 = run_kalman_on_pair(pair1_df)
 kalman1_pair2 = run_kalman_on_pair(pair2_df)
-
+plot_hedge_ratio(kalman1_pair1, title="Kalman HedgeRatio KO-DUK")
+plot_hedge_ratio(kalman1_pair2, title="Kalman HedgeRatio KO-SO")
