@@ -1,6 +1,6 @@
 import pandas as pd
 
-
+from kalman_hedge import run_kalman_on_pair
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices
 
@@ -24,5 +24,6 @@ johansen_results = run_johansen_test(data, ols_adf_results, save_path=f'data/res
 pair1_df = extract_pair(data, johansen_results, index=0)
 pair2_df = extract_pair(data, johansen_results, index=1)
 
-
-
+# Kalman Filter 1: Dynamic Hedge Ratio
+kalman1_pair1 = run_kalman_on_pair(pair1_df)
+kalman1_pair2 = run_kalman_on_pair(pair2_df)
