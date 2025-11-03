@@ -75,7 +75,7 @@ def run_kalman_on_pair(df_pair: pd.DataFrame,
                        q: float = 1e-5,
                        r: float = 1e-2,
                        save: bool = True,
-                       path_prefix: str = "data/",
+                       path_prefix: str = "data/kalman/",
                        label: str | None = None) -> pd.DataFrame:
     """
     Runs the classroom-style Kalman filter on a 2-column pair DataFrame.
