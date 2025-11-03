@@ -1,12 +1,15 @@
+import numpy as np
 import pandas as pd
 
 def clean_prices(data):
     data = data.copy()
-    # Convert objects to numeric values
-    data = data.apply(pd.to_numeric, errors="coerce")
-    data = data.drop(index=0)
+    data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
     data = data.drop(columns=['Price'])
-    data['Date'] = pd.to_datetime(data['Date'])
-    data = data.set_index('Date')
+    # Convert objects to numeric values
+    for col in data.columns:
+        if col != 'Date':
+            data[col] = pd.to_numeric(data[col], errors='coerce')
 
+    data = data.set_index('Date')
+    data = data.dropna()
     return data

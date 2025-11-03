@@ -222,3 +222,45 @@ def run_johansen_test(prices_df: pd.DataFrame, adf_results_df: pd.DataFrame,
 
     return results_df
 
+
+def extract_pair(prices_df: pd.DataFrame, johansen_df: pd.DataFrame,
+                               index: int, save: bool = True, path_prefix: str = "data/") -> pd.DataFrame:
+    """
+    Extracts and saves a pair of assets based on its row index from the Johansen results DataFrame.
+
+    Parameters
+    ----------
+    prices_df : pd.DataFrame
+        DataFrame with price data (Date index + tickers as columns).
+    johansen_df : pd.DataFrame
+        Full Johansen results DataFrame with columns ['Asset_1', 'Asset_2'].
+    index : int
+        Row index in johansen_df indicating which pair to extract.
+    save : bool, optional
+        Whether to save the pair CSV (default=True).
+    path_prefix : str, optional
+        Folder path prefix for saving (default='data/').
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing ['Date', Asset_1, Asset_2'] with aligned and cleaned data.
+    """
+
+    prices_df = prices_df.copy()
+
+    # Extract pair info by index
+    row = johansen_df.iloc[index]
+    asset1 = row["Asset_1"]
+    asset2 = row["Asset_2"]
+
+    if asset1 not in prices_df.columns or asset2 not in prices_df.columns:
+        raise ValueError(f"Assets {asset1} or {asset2} not found in price data.")
+
+    df_pair = prices_df[[asset1, asset2]].dropna().copy()
+    if save:
+        filename = f"{path_prefix}{asset1}_{asset2}_pair.csv"
+        df_pair.to_csv(filename)
+        print(f"💾 Saved pair to: {filename} with {len(df_pair)}")
+
+    return df_pair
