@@ -1,6 +1,6 @@
 import pandas as pd
 
-from data.graphs import plot_hedge_ratio
+from graphs import plot_hedge_ratio
 from kalman_hedge import run_kalman_on_pair
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices, split_dfs
