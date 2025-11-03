@@ -139,12 +139,11 @@ def run_kalman_on_pair(df_pair: pd.DataFrame,
 
     # Build compact output
     out = pd.DataFrame({
-        "Date": df.index,
-        "price1": df[asset1].values,
-        "price2": df[asset2].values,
+        asset1: df[asset1].values,
+        asset2: df[asset2].values,
         "beta_t_est": beta1_list,
         "spread_t": spread_list
-    })
+    }, index=df.index)
 
     # Save if needed
     if save:

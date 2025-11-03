@@ -8,7 +8,6 @@ from utils import clean_prices
 data = pd.read_csv('data/prices.csv')
 data = clean_prices(data)
 print(f"Tickers utilizados:\n{data.columns.values}")
-print(data.info())
 
 # Encontrar pares correlacionados
 correlated_pairs = find_correlated_pairs(data, window=252, threshold=0.6)
@@ -27,3 +26,4 @@ pair2_df = extract_pair(data, johansen_results, index=1)
 # Kalman Filter 1: Dynamic Hedge Ratio
 kalman1_pair1 = run_kalman_on_pair(pair1_df)
 kalman1_pair2 = run_kalman_on_pair(pair2_df)
+
