@@ -11,9 +11,8 @@ from utils import clean_prices, split_dfs
 # Pre-processing data
 data = pd.read_csv('data/raw_prices.csv')
 data = clean_prices(data)
-data.to_csv('data/prices.csv')
 train_df, test_df, val_df = split_dfs(data, 60, 20, 20)
-plot_splits(train_df, test_df, val_df)
+#plot_splits(train_df, test_df, val_df)
 print(f"Tickers utilizados:\n{data.columns.values}")
 
 
@@ -36,11 +35,19 @@ pair2_df = extract_pair(train_df, johansen_results, index=1)
 # Kalman Filter 1: Dynamic Hedge Ratio (for individual cointegrated pairs found)
 kalman1_pair1 = run_kalman_on_pair(pair1_df)
 kalman1_pair2 = run_kalman_on_pair(pair2_df)
-plot_hedge_ratio(kalman1_pair1)
-plot_hedge_ratio(kalman1_pair2)
+#plot_hedge_ratio(kalman1_pair1)
+#plot_hedge_ratio(kalman1_pair2)
 
 # Kalman Filter 2: Signal generation
 # --- KALMAN 2: Generación de Señales (nuevo paso) ---
 kalman2_pair1 = run_kalman_signal(kalman1_pair1, johansen_results, window_z=252, theta_input=1.8)
 kalman2_pair2 = run_kalman_signal(kalman1_pair2, johansen_results, window_z=252, theta_input=1.8)
 
+spread = kalman2_pair1['spread_t']
+signal = kalman2_pair1['signal_t']
+ret = spread.diff().fillna(0)
+strategy = signal.shift(1) * ret
+cum_profit = strategy.cumsum()
+
+cum_profit.plot(figsize=(10,5), title='Profit acumulado por señales')
+plt.show()

@@ -12,6 +12,8 @@ def clean_prices(data):
 
     data = data.set_index('Date')
     data = data.dropna()
+
+    data.to_csv('data/prices.csv')
     return data
 
 
