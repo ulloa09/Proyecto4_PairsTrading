@@ -1,5 +1,3 @@
-# kalman_filter.py  (puedes llamarlo así)
-
 import numpy as np
 import pandas as pd
 

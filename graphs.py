@@ -1,6 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+def plot_splits(train_df, test_df, val_df):
+    plt.figure(figsize=(10,4))
+    plt.plot(train_df.index, train_df.iloc[:, 0], label='Train')
+    plt.plot(test_df.index, test_df.iloc[:, 0], label='Test')
+    plt.plot(val_df.index, val_df.iloc[:, 0], label='Validation')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 def plot_hedge_ratio(kalman_pair: pd.DataFrame, title: str | None = None, save: bool = False, path_prefix: str = "data/"):
     """
@@ -61,3 +69,83 @@ def plot_hedge_ratio(kalman_pair: pd.DataFrame, title: str | None = None, save: 
 
     plt.show()
     return fig
+
+
+
+def plot_zscore_with_theta(kalman2_df: pd.DataFrame, title: str | None = None, save: bool = False):
+    """
+    Grafica el z-score a lo largo del tiempo con las bandas ±theta seleccionadas.
+
+    Parámetros
+    ----------
+    kalman2_df : pd.DataFrame
+        Resultado del filtro Kalman 2. Debe contener columnas ['z_t', 'theta_t'].
+    title : str, opcional
+        Título del gráfico.
+    """
+    plt.figure(figsize=(12, 6))
+    plt.plot(kalman2_df.index, kalman2_df['z_t'], label='Z-score', color='blue')
+    plt.axhline(0, color='black', linestyle='--', linewidth=1)
+
+    theta = kalman2_df['theta_t'].iloc[0]  # es constante (theta_input)
+    plt.axhline(theta, color='red', linestyle='--', label=f'+θ = {theta}')
+    plt.axhline(-theta, color='red', linestyle='--', label=f'-θ = {theta}')
+
+    plt.title(title or f"Z-score y Umbrales ±θ ({theta})")
+    plt.xlabel('Fecha')
+    plt.ylabel('Z-score normalizado')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    plt.show()
+
+
+def plot_signals_on_zscore(kalman2_df, title=None):
+    """
+    Muestra el z-score a lo largo del tiempo y marca las señales long/short generadas.
+    """
+    plt.figure(figsize=(12, 6))
+
+    # Línea del z-score
+    plt.plot(kalman2_df.index, kalman2_df['z_t'], label='Z-score', color='steelblue', alpha=0.8)
+    plt.axhline(0, color='black', linestyle='--', linewidth=1)
+
+    # Bandas de theta
+    theta = kalman2_df['theta_t'].iloc[0]
+    plt.axhline(theta, color='red', linestyle='--', label=f'+θ = {theta}')
+    plt.axhline(-theta, color='red', linestyle='--', label=f'-θ = {theta}')
+
+    # Señales: +1 = long (verde), -1 = short (rojo)
+    longs = kalman2_df[kalman2_df['signal_t'] == 1]
+    shorts = kalman2_df[kalman2_df['signal_t'] == -1]
+
+    plt.scatter(longs.index, longs['z_t'], marker='^', color='green', label='Compra (Long)', s=60, alpha=0.8)
+    plt.scatter(shorts.index, shorts['z_t'], marker='v', color='darkred', label='Venta (Short)', s=60, alpha=0.8)
+
+    plt.title(title or f"Z-score y señales generadas (θ = {theta})")
+    plt.xlabel('Fecha')
+    plt.ylabel('Z-score')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    plt.show()
+
+
+def plot_signals_on_spread(kalman2_df: pd.DataFrame, title: str | None = None):
+    """
+    Grafica el spread y marca las señales de compra y venta generadas.
+    """
+    a, b = kalman2_df.columns[0], kalman2_df.columns[1]
+    title = f"Señales sobre spread (Par{a},{b})"
+    plt.figure(figsize=(12, 6))
+    plt.plot(kalman2_df.index, kalman2_df['spread_t'], label='Spread', color='gray', alpha=0.7)
+    longs = kalman2_df[kalman2_df['signal_t'] == 1]
+    shorts = kalman2_df[kalman2_df['signal_t'] == -1]
+    plt.scatter(longs.index, longs['spread_t'], color='green', marker='^', label='Compra (Long)', s=60)
+    plt.scatter(shorts.index, shorts['spread_t'], color='red', marker='v', label='Venta (Short)', s=60)
+    plt.title(title or "Spread con señales generadas")
+    plt.xlabel('Fecha')
+    plt.ylabel('Spread')
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.show()

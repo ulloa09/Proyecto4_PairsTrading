@@ -58,4 +58,8 @@ def split_dfs(data: pd.DataFrame, train: int, test: int, validation: int) -> tup
     print(f"  Test:       {len(test_df)} rows ({test}%)")
     print(f"  Validation: {len(validation_df)} rows ({validation}%)")
 
+    train_df.to_csv('data/train.csv')
+    test_df.to_csv('data/test.csv')
+    validation_df.to_csv('data/validation.csv')
+
     return train_df, test_df, validation_df
