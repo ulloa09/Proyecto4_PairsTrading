@@ -17,7 +17,7 @@ print(f"Tickers utilizados:\n{data.columns.values}")
 
 
 # Encontrar pares correlacionados
-correlated_pairs = find_correlated_pairs(train_df, window=252, threshold=0.7)
+correlated_pairs = find_correlated_pairs(train_df, window=252, threshold=0.6)
 correlated_pairs.to_csv('data/correlated_pairs.csv', index=False)
 
 # -- PRUEBAS DE COINTEGRACIÓN --
@@ -42,12 +42,3 @@ kalman1_pair2 = run_kalman_on_pair(pair2_df)
 # --- KALMAN 2: Generación de Señales (nuevo paso) ---
 kalman2_pair1 = run_kalman_signal(kalman1_pair1, johansen_results, window_z=252, theta_input=1.8)
 kalman2_pair2 = run_kalman_signal(kalman1_pair2, johansen_results, window_z=252, theta_input=1.8)
-
-spread = kalman2_pair1['spread_t']
-signal = kalman2_pair1['signal_t']
-ret = spread.diff().fillna(0)
-strategy = signal.shift(1) * ret
-cum_profit = strategy.cumsum()
-
-cum_profit.plot(figsize=(10,5), title='Profit acumulado por señales')
-plt.show()
