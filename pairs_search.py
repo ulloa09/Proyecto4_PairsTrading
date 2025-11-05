@@ -54,6 +54,12 @@ def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float
     high_corr_pairs = corr_df[corr_df["Mean_Correlation"] > threshold]
     print(f"\nPairs with mean correlation > {threshold}:\n", high_corr_pairs.head(10))
 
+
+    # === Guardar matriz completa de correlaciones móviles ===
+    rolling_corr = data.rolling(window).corr()       # devuelve panel largo (nivel MultiIndex)
+    corr_matrix = rolling_corr.groupby(level=1).mean()  # promedio por ticker global
+    corr_matrix.to_csv("data/rolling_correlation_matrix.csv")
+
     return high_corr_pairs
 
 
