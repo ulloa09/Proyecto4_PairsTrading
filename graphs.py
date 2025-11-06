@@ -174,3 +174,78 @@ def plot_kalman_fits(df_kalman1: pd.DataFrame,
     plt.show()
 
     return fig
+
+
+def plot_vecm_mean(df_kalman2):
+    asset1, asset2 = df_kalman2.columns[:2]
+    plt.figure(figsize=(10,4))
+    plt.plot(df_kalman2.index, df_kalman2['vecm_t'], color='purple', label='VECMₜ')
+    plt.plot(df_kalman2.index, df_kalman2['vecm_t'].rolling(50).mean(),
+             color='black', linestyle='--', label='Media dinámica (μₜ)')
+    plt.title(f"Combinación cointegrante (VECMₜ) — {asset1}-{asset2}")
+    plt.xlabel("Fecha")
+    plt.ylabel("Valor cointegrante")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.show()
+
+
+def plot_dynamic_eigenvectors(df_kalman2):
+    plt.figure(figsize=(10, 4))
+    plt.plot(df_kalman2.index, df_kalman2["v1_t"], label="v₁ₜ", color='teal')
+    plt.plot(df_kalman2.index, df_kalman2["v2_t"], label="v₂ₜ", color='orange')
+    plt.title("Eigenvectores dinámicos estimados (Kalman 2)")
+    plt.xlabel("Fecha")
+    plt.ylabel("Valor")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.show()
+
+
+
+def plot_vecm_signals(df_kalman2, theta=1.8):
+    """
+    Grafica el Z-score del VECM y marca las señales de entrada/salida generadas por el filtro Kalman 2.
+
+    Parámetros
+    ----------
+    df_kalman2 : pd.DataFrame
+        DataFrame resultado del segundo filtro (con columnas 'vecm_t', 'z_t', 'signal_t').
+    theta : float
+        Umbral usado para la generación de señales (default=1.8).
+
+    Retorna
+    -------
+    matplotlib.figure.Figure
+        Objeto de figura generado.
+    """
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Serie principal del z-score
+    ax.plot(df_kalman2.index, df_kalman2["z_t"], color="steelblue", lw=1.5, label="Zₜ (VECM normalizado)")
+
+    # Bandas ±θ
+    ax.axhline(theta, color="red", linestyle="--", lw=1, label=f"+θ = {theta}")
+    ax.axhline(-theta, color="red", linestyle="--", lw=1, label=f"-θ = {-theta}")
+    ax.axhline(0, color="black", linestyle=":", lw=1)
+
+    # Señales: long (verde) y short (rojo)
+    long_signals = df_kalman2[df_kalman2["signal_t"] == 1]
+    short_signals = df_kalman2[df_kalman2["signal_t"] == -1]
+
+    ax.scatter(long_signals.index, long_signals["z_t"],
+               color="green", s=35, marker="^", label="Entrada Long (+1)")
+    ax.scatter(short_signals.index, short_signals["z_t"],
+               color="darkred", s=35, marker="v", label="Entrada Short (−1)")
+
+    # Personalización
+    ax.set_title("Z-score y Señales de Trading — VECM (Kalman 2)", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Fecha", fontsize=11)
+    ax.set_ylabel("Zₜ (desviación estándar)", fontsize=11)
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False)
+    plt.tight_layout()
+    plt.show()
+
+    return fig

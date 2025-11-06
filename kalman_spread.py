@@ -1,106 +1,108 @@
-# kalman_spread.py
 import numpy as np
 import pandas as pd
-from numpy.ma.core import inner
 
-from kalman_hedge import KalmanFilterReg  # misma clase base
+from kalman_hedge import KalmanFilterReg
 
-def run_kalman_signal(
-    kalman1_df: pd.DataFrame,
-    johansen_results: pd.DataFrame,
-    theta_input: float = 2.0,
-    q2: float = 1e-5,
-    r2: float = 1e-3,
-    window_z: int = 60,
-    save: bool = True,
-) -> pd.DataFrame:
+def run_kalman2_vecm(kalman1_df: pd.DataFrame,
+                            johansen_df: pd.DataFrame,
+                            q: float = 1e-6,
+                            r: float = 1e-2,
+                            p0: float = 10.0,
+                            theta: float = 1.8,
+                            window: int = 100):
     """
-    Segundo filtro de Kalman (Kalman 2)
-    -----------------------------------
-    Genera señales de entrada/salida a partir del spread del filtro 1 y los eigenvectores del test de Johansen.
-    Reutiliza la clase KalmanFilterReg (la misma del filtro 1).
+    Segundo filtro (anclado): v1_t = 1 y se estima gamma_t = v2_t con Kalman escalar
+    imponiendo 0 ≈ P1_t + gamma_t * P2_t. Luego normaliza VECM con rolling window
+    y genera señales {-1,0,+1} por umbral |z_t| > theta.
 
-    Entradas
-    ---------
+    Parámetros
+    ----------
     kalman1_df : DataFrame
-        Contiene las columnas [Activo_1, Activo_2, beta_t_est, spread_t].
-        Las dos primeras son los precios de los activos.
-    johansen_results : DataFrame
-        Contiene ['Asset_1','Asset_2','Eigenvector_1','Eigenvector_2'].
-    q2 : float, default=1e-5
-        Varianza del ruido de proceso.
-    r2 : float, default=1e-3
-        Varianza del ruido de observación.
-    window_z : int, default=60
-        Ventana rolling para el z-score.
-    save : bool, default=True
-        Si True, guarda el CSV en data/kalman/.
+        Salida del primer filtro con columnas [Asset_1, Asset_2, alpha, beta, y_pred, spread].
+    johansen_df : DataFrame
+        Debe contener ['Asset_1','Asset_2','Eigenvector_1','Eigenvector_2'] para inicializar gamma_0.
+    q, r : float
+        Ruido de proceso (suavidad de gamma_t) y de observación (ajuste de la medición).
+    p0 : float
+        Varianza inicial del estado gamma_0.
+    theta : float
+        Umbral para el z-score (señales).
+    window : int
+        Ventana para media y desviación móviles.
 
-    Retorna
+    Devuelve
     --------
-    DataFrame con columnas:
-        ['signal_t','theta_t','E·P_t','z_t','spread_t','beta_t_est']
+    df_res : DataFrame
+        Columnas: [Asset_1, Asset_2, alpha, beta, y_pred, spread,
+                   v1_t, v2_t, vecm_t, z_t, signal_t]
+        y guarda en data/kalman/kalman2_<Asset_1>_<Asset_2>.csv
     """
 
-    # 1) Identificar nombres de los activos directamente
-    activo1, activo2 = kalman1_df.columns[0], kalman1_df.columns[1]
+    # --- Identificación del par y precios ---
+    asset1, asset2 = kalman1_df.columns[:2]
+    p1 = kalman1_df[asset1].values.astype(float)
+    p2 = kalman1_df[asset2].values.astype(float)
 
-    # 2) Obtener eigenvectores correspondientes
-    mask = (
-        ((johansen_results["Asset_1"] == activo1) & (johansen_results["Asset_2"] == activo2)) |
-        ((johansen_results["Asset_1"] == activo2) & (johansen_results["Asset_2"] == activo1))
-    )
-    row = johansen_results.loc[mask]
+    # --- Eigenvector inicial (Johansen) para gamma_0 = v2/v1 ---
+    row = johansen_df[(johansen_df["Asset_1"] == asset1) &
+                      (johansen_df["Asset_2"] == asset2)]
     if row.empty:
-        raise ValueError(f"No se encontró eigenvector para {activo1}-{activo2} en johansen_results.")
+        raise ValueError(f"No se encontró eigenvector para {asset1}-{asset2} en johansen_df.")
+    v1_0, v2_0 = row[["Eigenvector_1", "Eigenvector_2"]].values[0]
+    denom = v1_0 if abs(v1_0) > 1e-12 else (1e-12 if v1_0 == 0 else np.sign(v1_0)*1e-12)
+    gamma = float(v2_0 / denom)  # estado inicial (v1_t ≡ 1)
 
-    e1, e2 = float(row["Eigenvector_1"].iloc[0]), float(row["Eigenvector_2"].iloc[0])
-    w_init = np.array([e1, e2]).reshape(-1, 1)
-    p_init = np.diag([abs(e1), abs(e2)])
+    # --- Inicialización Kalman escalar para gamma_t ---
+    P = float(p0)  # varianza del estado
 
-    # 3) Variables de observación
-    P1, P2 = kalman1_df[activo1].values, kalman1_df[activo2].values
-    S_t = P1 * e1 + P2 * e2     # x_t = E·P_t
-    y_t = kalman1_df["spread_t"].values  # y_t = spread_t
+    gamma_list = []
+    vecm_list  = []
 
-    # 4) Instancia del mismo filtro
-    kf = KalmanFilterReg(q=q2, r=r2, w_init=w_init, p_init=p_init)
+    # Bucle Kalman: modelo observación  y_t = -P1_t  ≈  gamma_t * P2_t
+    #   => innovación = y_t - H_t * gamma_pred  con H_t = P2_t
+    for y_t, H_t in zip(-p1, p2):
+        # Predict
+        gamma_pred = gamma
+        P_pred = P + q
 
-    # 5) Ciclo predict/update
-    w_hist = np.zeros((len(kalman1_df), 2))
-    for i, (x, y) in enumerate(zip(S_t, y_t)):
-        kf.predict()
-        kf.update(x_t=float(x), y_t=float(y))
-        w0, w1 = kf.params
-        w_hist[i, 0], w_hist[i, 1] = w0, w1
+        # Update
+        S_t = H_t * P_pred * H_t + r
+        K_t = (P_pred * H_t) / (S_t + 1e-12)
+        innovation = y_t - H_t * gamma_pred
 
-    # 6) Z-score rolling
-    S_series = pd.Series(S_t, index=kalman1_df.index, name="E·P_t")
-    mu = S_series.rolling(window=window_z, min_periods=window_z).mean()
-    sigma = S_series.rolling(window=window_z, min_periods=window_z).std(ddof=0)
-    z = ((S_series - mu) / sigma).rename("z_t")
+        gamma = gamma_pred + K_t * innovation
+        P = (1.0 - K_t * H_t) * P_pred
 
-    # 7) Política de decisión con theta fija ingresada
-    theta_t = pd.Series(theta_input, index=kalman1_df.index, name="theta_t")
-    signal = pd.Series(0, index=kalman1_df.index, dtype=int, name="signal_t")
-    signal[z > theta_input] = -1  # short
-    signal[z < -theta_input] = 1  # long
+        gamma_list.append(float(gamma))
+        vecm_list.append(float(p1[len(gamma_list)-1] + gamma * H_t))
 
-    # 8) Resultado final
-    out = pd.DataFrame({
-        activo1: P1,
-        activo2: P2,
-        "spread_t": kalman1_df["spread_t"].astype(float),
-        "beta_t_est": kalman1_df["beta_t_est"].astype(float),
-        "signal_t": signal,
-        "theta_t": theta_t,  # todas iguales al theta_input
-        "E·P_t": S_series,
-        "z_t": z
-    })
+    # --- Normalización por ventana móvil ---
+    vecm = np.array(vecm_list)
+    mu_t = pd.Series(vecm).rolling(window).mean().values
+    sd_t = pd.Series(vecm).rolling(window).std().values
+    z_t = (vecm - mu_t) / (sd_t + 1e-12)
 
+    # Señales (long cuando está “barato”, short cuando “caro”)
+    signal_t = np.where(z_t >  theta, -1,
+                 np.where(z_t < -theta,  +1, 0))
 
-    # 9) Guardar CSV (carpeta ya existe)
-    out.to_csv(f"data/kalman/kalman2_{activo1}_{activo2}.csv")
-    print(f"💾 Kalman2 results saved to: data/kalman/kalman2_{activo1}_{activo2}.csv")
+    # Rellena los primeros window-1 NaN de z con 0 para no generar señales espurias
+    z_t = np.nan_to_num(z_t, nan=0.0)
+    signal_t = np.where(np.isnan(mu_t) | np.isnan(sd_t), 0, signal_t)
 
-    return out
+    # --- Salida: conserva Kalman1 y añade VECM + señales ---
+    df_res = kalman1_df.copy()
+    df_res["v1_t"]     = 1.0
+    df_res["v2_t"]     = gamma_list
+    df_res["vecm_t"]   = vecm
+    df_res["z_t"]      = z_t
+    df_res["signal_t"] = signal_t
+
+    df_res = df_res[[asset1, asset2, 'alpha', 'beta', 'y_pred', 'spread',
+                     'v1_t', 'v2_t', 'vecm_t', 'z_t', 'signal_t']]
+
+    # Guardar (mismo estilo que Kalman 1)
+    output_path = f"data/kalman/kalman2_{asset1}_{asset2}.csv"
+    df_res.to_csv(output_path, index=True)
+
+    return df_res
