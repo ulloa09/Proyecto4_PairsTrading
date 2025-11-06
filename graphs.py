@@ -1,5 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.stats import alpha
+
 
 def plot_splits(train_df, test_df, val_df):
     plt.figure(figsize=(10,4))
@@ -10,142 +12,165 @@ def plot_splits(train_df, test_df, val_df):
     plt.grid(True)
     plt.show()
 
-def plot_hedge_ratio(kalman_pair: pd.DataFrame, title: str | None = None, save: bool = False, path_prefix: str = "data/"):
+
+def plot_hedge_ratios(kalman_pair1: pd.DataFrame,
+                      kalman_pair2: pd.DataFrame | None = None,
+                      title: str | None = None):
     """
-    Plots the dynamic hedge ratio (beta_t_est) over time from a Kalman results DataFrame.
-
-    Parameters
-    ----------
-    kalman_pair : pd.DataFrame
-        DataFrame with datetime index and columns [asset1, asset2, beta_t_est, spread_t].
-    title : str, optional
-        Custom title for the plot. If None, derived from asset names.
-    save : bool, optional
-        If True, saves the figure as a PNG file (default=False).
-    path_prefix : str, optional
-        Folder to save the PNG (default='data/').
-
-    Returns
-    -------
-    matplotlib.figure.Figure
-        The generated figure object.
-    """
-
-    df = kalman_pair.copy()
-
-    # Ensure datetime index
-    if not isinstance(df.index, pd.DatetimeIndex):
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"])
-            df = df.set_index("Date")
-
-    # Detect asset names
-    assets = [c for c in df.columns if c not in ["beta_t_est", "spread_t"]]
-    if len(assets) >= 2:
-        asset1, asset2 = assets[:2]
-        pair_name = f"{asset1}-{asset2}"
-    else:
-        pair_name = "Pair"
-
-    # Title
-    if title is None:
-        title = f"Hedge Ratio (βₜ) Over Time — {pair_name}"
-
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(df.index, df["beta_t_est"], color="royalblue", linewidth=1.8, label="βₜ (hedge ratio)")
-
-    ax.set_title(title, fontsize=14, fontweight="bold")
-    ax.set_xlabel("Date", fontsize=12)
-    ax.set_ylabel("βₜ (hedge ratio)", fontsize=12)
-    ax.grid(alpha=0.3)
-    ax.legend()
-
-    # Save
-    if save:
-        filename = f"{path_prefix}hedge_ratio_{pair_name}.png"
-        plt.savefig(filename, dpi=300, bbox_inches="tight")
-        print(f"💾 Saved plot to: {filename}")
-
-    plt.show()
-    return fig
-
-
-
-def plot_zscore_with_theta(kalman2_df: pd.DataFrame, title: str | None = None, save: bool = False):
-    """
-    Grafica el z-score a lo largo del tiempo con las bandas ±theta seleccionadas.
+    Grafica la evolución del hedge ratio (βₜ) en el tiempo para uno o dos pares de activos.
 
     Parámetros
     ----------
-    kalman2_df : pd.DataFrame
-        Resultado del filtro Kalman 2. Debe contener columnas ['z_t', 'theta_t'].
+    kalman_pair1 : pd.DataFrame
+        DataFrame de resultados del primer filtro de Kalman con columnas
+        [asset1, asset2, alpha, beta, y_pred, spread].
+    kalman_pair2 : pd.DataFrame, opcional
+        Segundo DataFrame (otro par) con la misma estructura.
+        Si no se proporciona, solo se grafica el primero.
+    title : str, opcional
+        Título personalizado. Si no se indica, se genera automáticamente.
+
+    Retorna
+    -------
+    matplotlib.figure.Figure
+        Objeto de figura generado.
+    """
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    # --- Primer par ---
+    df1 = kalman_pair1.copy()
+    asset1_a, asset2_a = df1.columns[:2]
+    label1 = f"βₜ ({asset1_a}-{asset2_a})"
+    ax.plot(df1.index, df1["beta"], label=label1, linewidth=1.8, color="royalblue")
+
+    # --- Segundo par (opcional) ---
+    if kalman_pair2 is not None:
+        df2 = kalman_pair2.copy()
+        asset1_b, asset2_b = df2.columns[:2]
+        label2 = f"βₜ ({asset1_b}-{asset2_b})"
+        ax.plot(df2.index, df2["beta"], label=label2, linewidth=1.8, color="darkorange")
+
+    # --- Personalización ---
+    if title is None:
+        if kalman_pair2 is None:
+            title = f"Hedge Ratio (βₜ) — {asset1_a}-{asset2_a}"
+        else:
+            title = f"Hedge Ratios (βₜ) — {asset1_a}-{asset2_a} vs {asset1_b}-{asset2_b}"
+
+    ax.set_title(title, fontsize=14, fontweight="bold")
+    ax.set_xlabel("Fecha", fontsize=12)
+    ax.set_ylabel("βₜ (hedge ratio dinámico)", fontsize=12)
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False)
+    plt.tight_layout()
+
+    return fig
+
+
+def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"):
+    """
+    Grafica los precios normalizados de dos activos para visualizar cruces.
+
+    Parámetros
+    ----------
+    df : pd.DataFrame
+        DataFrame con índice de fechas y dos columnas (precios de los activos).
     title : str, opcional
         Título del gráfico.
     """
-    plt.figure(figsize=(12, 6))
-    plt.plot(kalman2_df.index, kalman2_df['z_t'], label='Z-score', color='blue')
-    plt.axhline(0, color='black', linestyle='--', linewidth=1)
 
-    theta = kalman2_df['theta_t'].iloc[0]  # es constante (theta_input)
-    plt.axhline(theta, color='red', linestyle='--', label=f'+θ = {theta}')
-    plt.axhline(-theta, color='red', linestyle='--', label=f'-θ = {theta}')
+    # Asegurar que el índice sea datetime
+    if not pd.api.types.is_datetime64_any_dtype(df.index):
+        df.index = pd.to_datetime(df.index)
 
-    plt.title(title or f"Z-score y Umbrales ±θ ({theta})")
-    plt.xlabel('Fecha')
-    plt.ylabel('Z-score normalizado')
+    # Normalizar precios: (precio / precio inicial)
+    normalized_df = df / df.iloc[0]
+
+    # Graficar
+    plt.figure(figsize=(10, 5))
+    for col in normalized_df.columns:
+        plt.plot(normalized_df.index, normalized_df[col], label=col)
+
+    plt.title(title)
+    plt.xlabel("Fecha")
+    plt.ylabel("Precio normalizado (base 1)")
     plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.grid(True)
+    plt.show()
 
+def plot_spreads(pair1, pair2):
+    plt.figure(figsize=(12, 6))
+    asset1_p1, asset2_p2 = pair1.columns[0], pair1.columns[1]
+    asset1_p2, asset2_p1 = pair2.columns[0], pair2.columns[1]
+
+    plt.plot(pair1.index, pair1['spread'], label=f'Spread{asset1_p1}-{asset2_p1}', color='black', alpha=0.2)
+    plt.plot(pair2.index, pair2['spread'], label=f'Spread{asset1_p2}-{asset2_p2}', color='darkgreen', alpha=0.7)
+
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.xlabel('Fecha')
+    plt.legend()
     plt.show()
 
 
-def plot_signals_on_zscore(kalman2_df, title=None):
+def plot_kalman_fits(df_kalman1: pd.DataFrame,
+                     df_kalman2: pd.DataFrame | None = None,
+                     title: str | None = None):
     """
-    Muestra el z-score a lo largo del tiempo y marca las señales long/short generadas.
+    Grafica la comparación entre los precios observados y estimados (y_pred)
+    de uno o dos pares de activos procesados con el filtro de Kalman.
+
+    Parámetros
+    ----------
+    df_kalman1 : pd.DataFrame
+        DataFrame devuelto por run_kalman_on_pair para el primer par.
+    df_kalman2 : pd.DataFrame, opcional
+        Segundo DataFrame devuelto por run_kalman_on_pair (otro par).
+    title : str, opcional
+        Título personalizado del gráfico. Si no se especifica, se genera automáticamente.
+
+    Retorna
+    -------
+    matplotlib.figure.Figure
+        Objeto de figura generado.
     """
-    plt.figure(figsize=(12, 6))
 
-    # Línea del z-score
-    plt.plot(kalman2_df.index, kalman2_df['z_t'], label='Z-score', color='steelblue', alpha=0.8)
-    plt.axhline(0, color='black', linestyle='--', linewidth=1)
+    # --- Primer par ---
+    asset1_a, asset2_a = df_kalman1.columns[:2]
+    label_obs_1 = f"{asset1_a} (observado)"
+    label_pred_1 = f"{asset1_a} (estimado | {asset2_a})"
 
-    # Bandas de theta
-    theta = kalman2_df['theta_t'].iloc[0]
-    plt.axhline(theta, color='red', linestyle='--', label=f'+θ = {theta}')
-    plt.axhline(-theta, color='red', linestyle='--', label=f'-θ = {theta}')
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    # Señales: +1 = long (verde), -1 = short (rojo)
-    longs = kalman2_df[kalman2_df['signal_t'] == 1]
-    shorts = kalman2_df[kalman2_df['signal_t'] == -1]
+    ax.plot(df_kalman1.index, df_kalman1[asset1_a],
+            label=label_obs_1, color='steelblue', linewidth=1.5)
+    ax.plot(df_kalman1.index, df_kalman1['y_pred'],
+            label=label_pred_1, color='orange', linewidth=1.3, linestyle='--')
 
-    plt.scatter(longs.index, longs['z_t'], marker='^', color='green', label='Compra (Long)', s=60, alpha=0.8)
-    plt.scatter(shorts.index, shorts['z_t'], marker='v', color='darkred', label='Venta (Short)', s=60, alpha=0.8)
+    # --- Segundo par (opcional) ---
+    if df_kalman2 is not None:
+        asset1_b, asset2_b = df_kalman2.columns[:2]
+        label_obs_2 = f"{asset1_b} (observado)"
+        label_pred_2 = f"{asset1_b} (estimado | {asset2_b})"
 
-    plt.title(title or f"Z-score y señales generadas (θ = {theta})")
-    plt.xlabel('Fecha')
-    plt.ylabel('Z-score')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
+        ax.plot(df_kalman2.index, df_kalman2[asset1_b],
+                label=label_obs_2, color='seagreen', linewidth=1.5)
+        ax.plot(df_kalman2.index, df_kalman2['y_pred'],
+                label=label_pred_2, color='darkred', linewidth=1.3, linestyle='--')
 
+    # --- Personalización general ---
+    if title is None:
+        if df_kalman2 is None:
+            title = f"{asset1_a} vs estimado | Predictor: {asset2_a}"
+        else:
+            title = f"Comparación de fits Kalman — {asset1_a}-{asset2_a} y {asset1_b}-{asset2_b}"
+
+    ax.set_title(title, fontsize=13, fontweight='bold')
+    ax.set_xlabel("Fecha", fontsize=11)
+    ax.set_ylabel("Precio", fontsize=11)
+    ax.grid(alpha=0.3)
+    ax.legend(frameon=False, fontsize=9)
+    plt.tight_layout()
     plt.show()
 
-
-def plot_signals_on_spread(kalman2_df: pd.DataFrame, title: str | None = None):
-    """
-    Grafica el spread y marca las señales de compra y venta generadas.
-    """
-    a, b = kalman2_df.columns[0], kalman2_df.columns[1]
-    title = f"Señales sobre spread (Par{a},{b})"
-    plt.figure(figsize=(12, 6))
-    plt.plot(kalman2_df.index, kalman2_df['spread_t'], label='Spread', color='gray', alpha=0.7)
-    longs = kalman2_df[kalman2_df['signal_t'] == 1]
-    shorts = kalman2_df[kalman2_df['signal_t'] == -1]
-    plt.scatter(longs.index, longs['spread_t'], color='green', marker='^', label='Compra (Long)', s=60)
-    plt.scatter(shorts.index, shorts['spread_t'], color='red', marker='v', label='Venta (Short)', s=60)
-    plt.title(title or "Spread con señales generadas")
-    plt.xlabel('Fecha')
-    plt.ylabel('Spread')
-    plt.legend()
-    plt.grid(True, linestyle='--', alpha=0.6)
-    plt.show()
+    return fig

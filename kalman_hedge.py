@@ -1,155 +1,109 @@
 import numpy as np
 import pandas as pd
-
+from pathlib import Path
 
 class KalmanFilterReg:
     """
     Kalman filter for a dynamic linear regression:
-        y_t = (w0_t) + (w1_t) * x_t + v_t
+        y_t = α_t + β_t * x_t + v_t
     with state evolution:
-        w_t = w_{t-1} + w_noise
-    This matches the style used in class.
-    """
-    def __init__(self, q: float = 1e-5, r: float = 1e-2,
-                 w_init = None,
-                 p_init = None):
-        # Initial parameters (w0, w1)
-        if w_init is None:
-            # same idea as notebook: start close to the true but not exact
-            self.w = np.array([0.0, 0.0]).reshape(-1, 1)
-        else:
-            self.w = w_init.reshape(-1, 1)
-
-        # State transition (random walk)
-        self.A = np.eye(2)
-
-        # Process noise (how much I let betas move)
-        self.Q = np.eye(2) * q
-
-        # Observation noise (how noisy is y_t)
-        self.R = np.array([[r]])
-
-        # Error covariance
-        if p_init is None:
-            self.P = np.eye(2) * 10.0   # big uncertainty at start
-        else:
-            self.P = p_init
-
-    def predict(self):
-        """
-        Prediction step: w_{t|t-1}, P_{t|t-1}
-        """
-        self.w = self.A @ self.w
-        self.P = self.A @ self.P @ self.A.T + self.Q
-
-    def update(self, x_t: float, y_t: float):
-        """
-        Update step with one observation (x_t, y_t)
-        """
-        # Observation matrix C_t = [1  x_t]
-        C = np.array([[1.0, x_t]])  # shape (1,2)
-
-        # Innovation covariance
-        S = C @ self.P @ C.T + self.R  # shape (1,1)
-
-        # Kalman gain
-        K = self.P @ C.T @ np.linalg.inv(S)  # shape (2,1)
-
-        # Update state
-        # y_t - C w_{t|t-1}
-        innovation = y_t - (C @ self.w)[0, 0]
-        self.w = self.w + K * innovation
-
-        # Update covariance
-        self.P = (np.eye(2) - K @ C) @ self.P
-
-    @property
-    def params(self):
-        # Return w0_t, w1_t
-        return self.w[0, 0], self.w[1, 0]
-
-
-def run_kalman_on_pair(df_pair: pd.DataFrame,
-                       q: float = 1e-5,
-                       r: float = 1e-2,
-                       save: bool = True,
-                       path_prefix: str = "data/kalman/",
-                       label: str | None = None) -> pd.DataFrame:
-    """
-    Runs the classroom-style Kalman filter on a 2-column pair DataFrame.
+        w_t = w_{t-1} + η_t
+    where w_t = [α_t, β_t]^T.
 
     Parameters
     ----------
-    df_pair : pd.DataFrame
-        DataFrame with Date index and exactly 2 price columns, e.g. ['KO', 'DUK'].
     q : float
-        Process noise scale (how fast betas can move).
+        Process noise variance (Q = q * I_2).
     r : float
-        Observation noise scale.
-    save : bool
-        If True, saves to CSV as 'kalman1_<asset1>_<asset2>.csv'
-    path_prefix : str
-        Folder to save the output.
-    label : str | None
-        If you want to force a custom name; if None it's built from columns.
-
-    Returns
-    -------
-    pd.DataFrame
-        Original pair + beta0_t, beta1_t, spread_t
+        Observation noise variance (R = r).
+    w_init : np.ndarray, optional
+        Initial state vector [α_0, β_0].
+    p_init : np.ndarray, optional
+        Initial covariance matrix (2x2).
     """
 
-    # Make a safe copy
-    df = df_pair.copy()
+    def __init__(self, q: float = 1e-5, r: float = 1e-2,
+                 w_init=None, p_init=None):
+        # Estado inicial (α_0, β_0)
+        self.w = np.array([[0.0], [0.0]]) if w_init is None else w_init.reshape(-1, 1)
+        # Covarianza inicial del estado (P_0)
+        self.P = np.eye(2) * 1.0 if p_init is None else p_init
+        # Matriz de transición del estado (identidad: paseo aleatorio)
+        self.A = np.eye(2)
+        # Varianzas del proceso y observación
+        self.q = q
+        self.r = r
 
-    # Ensure datetime index
-    if "Date" in df.columns:
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.set_index("Date")
+    def predict(self):
+        """Predicción del estado y su covarianza."""
+        self.w = self.A @ self.w
+        self.P = self.A @ self.P @ self.A.T + self.q * np.eye(2)
 
-    # We expect exactly two assets here
+    def update(self, y_t: float, x_t: float):
+        """
+        Actualiza el estado dado un nuevo par (x_t, y_t).
+        Devuelve la estimación instantánea (α_t, β_t) y el spread.
+        """
+        # Vector de observación
+        C_t = np.array([[1.0, x_t]])
+        # Predicción del precio
+        y_pred = float(C_t @ self.w)
+        # Innovación (error)
+        e_t = y_t - y_pred
+        # Varianza de la innovación
+        S_t = C_t @ self.P @ C_t.T + self.r
+        # Ganancia de Kalman
+        K_t = self.P @ C_t.T / S_t
+        # Actualización del estado
+        self.w = self.w + K_t * e_t
+        # Actualización de la covarianza
+        self.P = (np.eye(2) - K_t @ C_t) @ self.P
+
+        alpha_t, beta_t = float(self.w[0]), float(self.w[1])
+        spread_t = y_t - (alpha_t + beta_t * x_t)
+        return alpha_t, beta_t, spread_t
+
+
+def run_kalman_on_pair(pair_df: pd.DataFrame, q: float = 1e-5, r: float = 1e-2):
+    """
+    Ejecuta el primer filtro de Kalman sobre un par cointegrado.
+
+    Parámetros
+    ----------
+    csv_path : str
+        Ruta al archivo CSV con precios de dos activos (e.g. 'data/KO_DUK_pair.csv').
+    q, r : float
+        Parámetros de ruido de proceso y observación.
+
+    Devuelve
+    --------
+    df_result : pd.DataFrame
+        DataFrame con columnas [Asset_1, Asset_2, alpha_t, beta_t, spread_t].
+    También guarda el resultado en data/kalman/kalman1_<Asset_1>_<Asset_2>.csv
+    """
+
+    df = pair_df.copy()
+    df.columns = [col.strip() for col in df.columns]  # limpieza ligera
     asset1, asset2 = df.columns[:2]
+    y, x = df[asset1].values, df[asset2].values
 
-    y_vals = df[asset1].values
-    x_vals = df[asset2].values
-
-    # Initialize Kalman as in class
     kf = KalmanFilterReg(q=q, r=r)
 
-    beta0_list = []
-    beta1_list = []
-    spread_list = []
-
-    for y_t, x_t in zip(y_vals, x_vals):
-        # 1. predict
+    results = []
+    for y_t, x_t in zip(y, x):
         kf.predict()
+        alpha_t, beta_t, spread_t = kf.update(y_t, x_t)
+        y_pred_t = alpha_t + beta_t * x_t
+        results.append((alpha_t, beta_t, spread_t, y_pred_t))
 
-        # 2. update with current observation
-        kf.update(x_t, y_t)
+    df_res = pd.DataFrame(results, columns=['alpha', 'beta', 'spread', 'y_pred'], index=df.index)
+    df_res[asset1] = df[asset1]
+    df_res[asset2] = df[asset2]
+    df_res = df_res[[asset1, asset2, 'alpha', 'beta', 'y_pred', 'spread']]
 
-        # 3. store params
-        b0, b1 = kf.params
-        beta0_list.append(b0)
-        beta1_list.append(b1)
+    # Guarda resultado en data/kalman/
+    output_path = Path("data/kalman") / f"kalman1_{asset1}_{asset2}.csv"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df_res.to_csv(output_path, index=True)
 
-        # current spread using dynamic beta
-        spread_list.append(y_t - (b0 + b1 * x_t))
-
-    # Build compact output
-    out = pd.DataFrame({
-        asset1: df[asset1].values,
-        asset2: df[asset2].values,
-        "beta_t_est": beta1_list,
-        "spread_t": spread_list
-    }, index=df.index)
-
-    # Save if needed
-    if save:
-        if label is None:
-            filename = f"kalman1_{asset1}_{asset2}.csv"
-        else:
-            filename = f"kalman1_{label}.csv"
-        out.to_csv(f"{path_prefix}{filename}")
-        print(f"💾 Kalman results saved to: {path_prefix}{filename}")
-
-    return out
+    return df_res
