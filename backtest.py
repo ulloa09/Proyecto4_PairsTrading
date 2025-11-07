@@ -126,11 +126,17 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:f
 
 
 
-        ## CERRAR OPERACIONES/POSICIONES
+    ## CERRAR OPERACIONES/POSICIONES
+        # LARGAS
         for position in active_long_ops.copy():
             if abs(vecm_norm) < 0.05:
                 if position.ticker == asset1:
                     pnl = (p1 - position.open_price)
                     cash += p1 * position.n_shares * (1-COM)
+                    position.close_price = p1
+                if position.ticker == asset2:
+                    pnl = (p2 - position.open_price)
+                    cash += p2 * position.n_shares * (1-COM)
+                    position.close_price = p2
 
-
+        for position in active_short_ops
