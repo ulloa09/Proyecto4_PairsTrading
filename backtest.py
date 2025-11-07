@@ -138,5 +138,32 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:f
                     pnl = (p2 - position.open_price)
                     cash += p2 * position.n_shares * (1-COM)
                     position.close_price = p2
+            # Quitar posición porque ya se cerró
+            active_long_ops.remove(position)
 
-        for position in active_short_ops
+        for position in active_short_ops.copy():
+            if abs(vecm_norm) < 0.05:
+                if position.ticker == asset1:
+                    pnl = (position.open_price - p1) * position.n_shares
+                    comission = p1 * position.n_shares * COM
+                    cash = pnl - comission
+                    position.close_price = p1
+
+                if position.ticker == asset2:
+                    pnl = (position.open_price - p2) * position.n_shares
+                    comission = p2 * position.n_shares * COM
+                    cash = pnl - comission
+                    position.close_price = p2
+            #Quitar posición porque ya se cerró
+            active_short_ops.remove(position)
+
+    return cash, portfolio_value, active_long_ops, active_short_ops
+
+
+
+
+
+
+
+
+
