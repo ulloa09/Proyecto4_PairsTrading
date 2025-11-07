@@ -3,11 +3,15 @@ from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 from functions import get_portfolio_value
+from kalman_hedge import KalmanFilterReg
 from objects import Operation
 
 theta = [0.5, 2.0]
+q = 1e-5
+r = 1e-2
 
-def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:float):
+def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
+             window_size:int, theta:float, q: float, r:float):
 
     # Copias por seguridad
     df = df.copy()
@@ -25,24 +29,28 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:f
     active_short_ops: list[Operation] = []
 
     # Definir KALMANs
-    kalman_1 = kalman(...)
+    kalman_1 = KalmanFilterReg(q=q, r=r)
+    hedge_ratio_list = []
+    spreads_list = []
+
     kalman_2 = kalman(...)
 
     # Obtener nombres de activos
     asset1, asset2 = df.columns[0], df.columns[1]
 
     for i, row in df.itertuples():
-        p1 = row.asset1
-        p2 = row.asset2
+        p1 = getattr(row, asset1)
+        p2 = getattr(row, asset2)
 
         # ACTUALIZAR KALMAN 1
-        x = p1
-        y = p2
+        y_t = p1
+        x_t = p2
 
         kalman_1.predict()
-        kalman_1.update(x, y)
-        w0, w1 = kalman_1.params
-        hedge_ratio = w1
+        alpha_t, beta_t, spread_t = kalman_1.update(y_t, x_t)
+        w0, w1 = alpha_t, beta_t
+        hedge_ratio = w1  # <- hedge ratio
+
 
         # ACTUALIZAR KALMAN 2
         x1 = p1
@@ -62,9 +70,12 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:f
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
-            if position.type == 'long' and position.ticker == asset1:
+            if position.type == 'short' and position.ticker == asset1:
                 borr_cost = row.asset1 * position.n_shares * BORROW_RATE
                 cash -= borr_cost
+            elif position.type == 'short' and position.ticker == asset2:
+                borr_cost = row.asset2 * position.n_shares * BORROW_RATE
+                cash += borr_cost
 
 
 
