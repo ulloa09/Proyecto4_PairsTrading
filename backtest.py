@@ -10,12 +10,11 @@ theta = [0.5, 2.0]
 q = 1e-5
 r = 1e-2
 
-def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
-             window_size:int, theta:float, q: float, r:float):
+def backtest(df: pd.DataFrame, window_size:int,
+             theta:float, q: float, r:float):
 
     # Copias por seguridad
     df = df.copy()
-    kalman2df = kalman2df.copy()
 
     # Condiciones Iniciales
     COM = 0.125
@@ -33,14 +32,15 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
     hedge_ratio_list = []
     spreads_list = []
 
-    kalman_2 = kalman(...)
+    #kalman_2 = kalman(...)
 
     # Obtener nombres de activos
-    asset1, asset2 = df.columns[0], df.columns[1]
+    asset1, asset2 = df.columns[:2]
 
-    for i, row in df.itertuples():
+    for row in df.itertuples(index=True):
         p1 = getattr(row, asset1)
         p2 = getattr(row, asset2)
+        i = row.index
 
         # ACTUALIZAR KALMAN 1
         y_t = p1
@@ -49,9 +49,10 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
         kalman_1.predict()
         alpha_t, beta_t, spread_t = kalman_1.update(y_t, x_t)
         w0, w1 = alpha_t, beta_t
-        hedge_ratio = w1  # <- hedge ratio
+        hedge_ratio = w1  # <- hedge ratio (redundante)
 
-
+        vecm_norm = 0
+        '''
         # ACTUALIZAR KALMAN 2
         x1 = p1
         x2 = p2
@@ -66,7 +67,7 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
         vecms_sample = vecms_hat[-252:]
         ### AQUÍ SE NORMALIZA EL VECM PARA OBTENER LA COMPARACIÓN Y SACAR SEÑAL
         vecm_norm =
-
+        '''
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
@@ -79,14 +80,14 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
 
 
 
-        #  APERTURA OPERACIÓN ( VECM NORM > THETA )
+        #  APERTURA OPERACIÓN ( VECM NORM > THETA ) LONG ASSET1 / SHORT ASSET 2
         if vecm_norm > theta and active_long_ops is None and active_short_ops is None:
 
             available = cash * 0.4
-            # P1 es el activo barato, se hace LONG
+            # ASSET1 es el activo barato, se hace LONG
             n_shares_long = available // (p1 * (1+COM))
             costo = n_shares_long * (p1 * (1+COM))
-            # P2 es el activo caro, se hace SHORT
+            # ASSET2 es el activo caro, se hace SHORT
             n_shares_short = available * hedge_ratio
             cost_short = p2 * n_shares_short * COM
 
@@ -114,7 +115,7 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
             n_shares_short = available // (p1 * (1+COM))
             cost_short = n_shares_short * (p1 * (1+COM))
             # P2 es el activo barato, se hace LONG
-            n_shares_long = available *
+            n_shares_long = available * hedge_ratio
             costo = p2 * n_shares_long * COM
 
             ## COMPRA DEL ACTIVO 2
@@ -157,18 +158,18 @@ def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame,
                 if position.ticker == asset1:
                     pnl = (position.open_price - p1) * position.n_shares
                     comission = p1 * position.n_shares * COM
-                    cash = pnl - comission
+                    cash += pnl - comission
                     position.close_price = p1
 
                 if position.ticker == asset2:
                     pnl = (position.open_price - p2) * position.n_shares
                     comission = p2 * position.n_shares * COM
-                    cash = pnl - comission
+                    cash += pnl - comission
                     position.close_price = p2
             #Quitar posición porque ya se cerró
             active_short_ops.remove(position)
 
-    return cash, portfolio_value, active_long_ops, active_short_ops
+    return cash, portfolio_value[-1], active_long_ops, active_short_ops
 
 
 

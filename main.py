@@ -1,9 +1,10 @@
 import pandas as pd
 from matplotlib import pyplot as plt
 
+from backtest import backtest
 from graphs import plot_splits, plot_normalized_prices, plot_spreads, \
     plot_hedge_ratios, plot_kalman_fits, plot_vecm_mean, plot_dynamic_eigenvectors, plot_vecm_signals
-from kalman_hedge import run_kalman_on_pair
+from kalman_hedge import run_kalman_on_pair, KalmanFilterReg
 from kalman_spread import run_kalman2_vecm
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices, split_dfs
@@ -39,7 +40,7 @@ pair2_df = extract_pair(train_df, johansen_results, index=1)
 #plot_normalized_prices(pair1_df)
 #plot_normalized_prices(pair2_df)
 
-
+'''
 # -- FILTROS DE KALMAN --
 # Kalman Filter 1: Dynamic Hedge Ratio (for individual cointegrated pairs found)
 kalman1_pair1 = run_kalman_on_pair(pair1_df, q=1e-8, r=1e-3)
@@ -59,3 +60,30 @@ plot_dynamic_eigenvectors(kalman2_pair1)
 plot_dynamic_eigenvectors(kalman2_pair2)
 plot_vecm_signals(kalman2_pair1)
 plot_vecm_signals(kalman2_pair2)
+'''
+
+# Suponiendo que df tiene tus dos activos
+asset1, asset2 = pair1_df.columns[:2]
+y, x = pair1_df[asset1].values, pair1_df[asset2].values
+
+kf = KalmanFilterReg(q=1e-5, r=1e-2)
+
+alphas, betas, spreads = [], [], []
+
+for y_t, x_t in zip(y, x):
+    kf.predict()
+    a, b, s = kf.update(y_t, x_t)
+    alphas.append(a)
+    betas.append(b)
+    spreads.append(s)
+
+plt.figure(figsize=(10,4))
+plt.plot(betas, label='β_t (hedge ratio)')
+plt.title(f'Hedge ratio dinámico: {asset1}-{asset2}')
+plt.legend()
+plt.show()
+
+cash, portfolio_value, longs, shorts = backtest(test_df.head(300), window_size=252,
+                                                theta=1.8, q=1e-5, r=1e-2)
+
+print(cash, portfolio_value, longs, shorts)
