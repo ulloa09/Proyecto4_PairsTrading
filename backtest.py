@@ -1,57 +1,136 @@
+import pandas as pd
 from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
+from functions import get_portfolio_value
+from objects import Operation
+
 theta = [0.5, 2.0]
-COM = 0.125
-BORROW_RATE = 0.25/100
 
-kalman_1 = kalman(...)
-kalman_2 = kalman(...)
+def backtest(df: pd.DataFrame, kalman2df: pd.DataFrame, window_size:int, theta:float):
 
-vecms_hat = []
+    # Copias por seguridad
+    df = df.copy()
+    kalman2df = kalman2df.copy()
 
-asset1, asset2 = df.columns[0], df.columns[1]
+    # Condiciones Iniciales
+    COM = 0.125
+    BORROW_RATE = 0.25/100
+    cash = 1_000_000
 
-for i, row in data.iterrows():
-    p1 = row.asset1
-    p2 = row.asset2
+    # Listas para almacenar
+    vecms_hat = []
+    portfolio_value = []
+    active_long_ops: list[Operation] = []
+    active_short_ops: list[Operation] = []
 
-    # ACTUALIZAR KALMAN 1
-    y = p1
-    x = p2
+    # Definir KALMANs
+    kalman_1 = kalman(...)
+    kalman_2 = kalman(...)
 
-    kalman_1.update(x, y)
-    w0, w1 = kalman_1.params
-    hedge_ratio = w1
+    # Obtener nombres de activos
+    asset1, asset2 = df.columns[0], df.columns[1]
 
-    # ACTUALIZAR KALMAN 2
-    x1 = p1
-    x2 = p2
-    eigenvector = coint_johansen(df.iloc[i-252:i,:])
-    e1, e2 = eigenvector
-    vecm = e1 * x1 + e2 * x2
-    kalman_2.update(x1, x2, vecm)
-    e1_hat, e2_hat = kalman_2.params
-    vecm_hat = e1_hat * x1 + e2_hat * x2
-    vecms_hat.append(vecm_hat)
-    vecms_sample = vecms_hat[-252:]
-    vecm_norm = ### AQUÍ SE NORMALIZA EL VECM PARA OBTENER LA COMPARACIÓN Y SACAR SEÑAL
+    for i, row in df.itertuples():
+        p1 = row.asset1
+        p2 = row.asset2
+
+        # ACTUALIZAR KALMAN 1
+        x = p1
+        y = p2
+
+        kalman_1.predict()
+        kalman_1.update(x, y)
+        w0, w1 = kalman_1.params
+        hedge_ratio = w1
+
+        # ACTUALIZAR KALMAN 2
+        x1 = p1
+        x2 = p2
+        eigenvector = coint_johansen(df.iloc[i-252:i,:])
+        e1, e2 = eigenvector
+        vecm = e1 * x1 + e2 * x2
+        kalman_2.predict()
+        kalman_2.update(x1, x2, vecm)
+        e1_hat, e2_hat = kalman_2.params
+        vecm_hat = e1_hat * x1 + e2_hat * x2
+        vecms_hat.append(vecm_hat)
+        vecms_sample = vecms_hat[-252:]
+        ### AQUÍ SE NORMALIZA EL VECM PARA OBTENER LA COMPARACIÓN Y SACAR SEÑAL
+        vecm_norm =
 
 
-    #  APERTURA OPERACIÓN ( VECM NORM supera THETA )
-    if vecm_norm > theta and active_long_positions is None and active_short_positions is None:
-        ## COMPRA DEL ACTIVO 1
-        available = cash * 0.4
-        n_shares_long = available // (p1 * (1+COM))
-        if available >= n_shares_long * (p1*(1+COM)):
-            cash -=
-
-        ## SHORT DEL ACTIVO 2
-        n_shares_short = available * hedge_ratio
-        cost = p2 * n_shares_short * COM
-        cash -=   ## NO SE DEBE SUMAR NADA
+        # COBRAR BORROW RATE PARA SHORTS DIARIO
+        for position in active_short_ops.copy():
+            if position.type == 'long' and position.ticker == asset1:
+                borr_cost = row.asset1 * position.n_shares * BORROW_RATE
+                cash -= borr_cost
 
 
-    # CIERRE DE POSICIONES
-    if abs(vecm_norm) < 0.05
+
+        #  APERTURA OPERACIÓN ( VECM NORM > THETA )
+        if vecm_norm > theta and active_long_ops is None and active_short_ops is None:
+
+            available = cash * 0.4
+            # P1 es el activo barato, se hace LONG
+            n_shares_long = available // (p1 * (1+COM))
+            costo = n_shares_long * (p1 * (1+COM))
+            # P2 es el activo caro, se hace SHORT
+            n_shares_short = available * hedge_ratio
+            cost_short = p2 * n_shares_short * COM
+
+            ## COMPRA DEL ACTIVO 1
+            if available >= costo:
+                cash -= costo
+                long_op = Operation(ticker=asset1, type='long',
+                                    n_shares=n_shares_long, open_price=p1,
+                                    close_price=0, date=row.index)
+                active_long_ops.append(long_op)
+
+            ## SHORT DEL ACTIVO 2
+                cash -= cost_short ## NO SE DEBE SUMAR NADA
+                short_op = Operation(ticker=asset2, type='short',
+                                     n_shares=n_shares_short, open_price=p2,
+                                     close_price=0, date=row.index)
+                active_short_ops.append(short_op)
+
+
+        # APERTURA OPERACIÓN ( VECM NORM < -THETA )
+        if vecm_norm < -theta and active_long_ops is None and active_short_ops is None:
+            ## COMPRA DEL ACTIVO 2
+            available = cash * 0.4
+            # Ahora P1 es el activo caro, se hace SHORT
+            n_shares_short = available // (p1 * (1+COM))
+            cost_short = n_shares_short * (p1 * (1+COM))
+            # P2 es el activo barato, se hace LONG
+            n_shares_long = available *
+            costo = p2 * n_shares_long * COM
+
+            ## COMPRA DEL ACTIVO 2
+            if available >= costo:
+                cash -= costo
+                long_op = Operation(ticker=asset2, type='long',
+                                    n_shares=n_shares_long, open_price=p2,
+                                    close_price=0, date=row.index)
+                active_long_ops.append(long_op)
+
+            ## SHORT DEL ACTIVO 1
+                cash -= cost_short
+                short_op = Operation(ticker=asset2, type='short',
+                                     n_shares=n_shares_short, open_price=p1,
+                                     close_price=0, date=row.index)
+                active_short_ops.append(short_op)
+
+        portfolio_value.append(get_portfolio_value(cash, active_long_ops, active_short_ops,
+                                                   x_ticker=asset1, y_ticker=asset2))
+
+
+
+        ## CERRAR OPERACIONES/POSICIONES
+        for position in active_long_ops.copy():
+            if abs(vecm_norm) < 0.05:
+                if position.ticker == asset1:
+                    pnl = (p1 - position.open_price)
+                    cash += p1 * position.n_shares * (1-COM)
+
 
