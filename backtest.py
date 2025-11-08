@@ -17,7 +17,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Condiciones Iniciales
     DAYS = 252
-    COM = 0.125
+    COM = 0.00125
     BORROW_RATE = 0.25/100 / DAYS
     cash = 1_000_000
 
@@ -26,6 +26,7 @@ def backtest(df: pd.DataFrame, window_size:int,
     active_long_ops: list[Operation] = []
     active_short_ops: list[Operation] = []
     signals = []
+    pnl_history = []
 
     # Obtener nombres de activos
     asset1, asset2 = df.columns[:2]
@@ -118,10 +119,10 @@ def backtest(df: pd.DataFrame, window_size:int,
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
             if position.type == 'short' and position.ticker == asset1:
-                borr_cost = row.asset1 * position.n_shares * BORROW_RATE
+                borr_cost = p1 * position.n_shares * BORROW_RATE
                 cash -= borr_cost
             elif position.type == 'short' and position.ticker == asset2:
-                borr_cost = row.asset2 * position.n_shares * BORROW_RATE
+                borr_cost = p2 * position.n_shares * BORROW_RATE
                 cash -= borr_cost
 
 
@@ -134,7 +135,7 @@ def backtest(df: pd.DataFrame, window_size:int,
             n_shares_long = available // (p1 * (1+COM))
             costo = n_shares_long * (p1 * (1+COM))
             # ASSET2 es el activo caro, se hace SHORT
-            n_shares_short = available * hedge_ratio
+            n_shares_short = available * abs(hedge_ratio)
             cost_short = p2 * n_shares_short * COM
 
             ## COMPRA DEL ACTIVO 1
@@ -161,7 +162,7 @@ def backtest(df: pd.DataFrame, window_size:int,
             n_shares_short = available // (p1 * (1+COM))
             cost_short = n_shares_short * (p1 * (1+COM))
             # P2 es el activo barato, se hace LONG
-            n_shares_long = available * hedge_ratio
+            n_shares_long = available * abs(hedge_ratio)
             costo = p2 * n_shares_long * COM
 
             ## COMPRA DEL ACTIVO 2
@@ -192,28 +193,32 @@ def backtest(df: pd.DataFrame, window_size:int,
                     pnl = (p1 - position.open_price)
                     cash += p1 * position.n_shares * (1-COM)
                     position.close_price = p1
+                    pnl_history.append(pnl)
                 if position.ticker == asset2:
                     pnl = (p2 - position.open_price)
                     cash += p2 * position.n_shares * (1-COM)
                     position.close_price = p2
-            # Quitar posición porque ya se cerró
-            active_long_ops.remove(position)
+                    pnl_history.append(pnl)
+                # Quitar posición porque ya se cerró
+                active_long_ops.remove(position)
 
         for position in active_short_ops.copy():
             if abs(vecm_norm) < 0.05:
                 if position.ticker == asset1:
                     pnl = (position.open_price - p1) * position.n_shares
-                    comission = p1 * position.n_shares * COM
-                    cash += pnl - comission
+                    commission = p1 * position.n_shares * COM
+                    cash += pnl - commission
                     position.close_price = p1
+                    pnl_history.append(pnl)
 
                 if position.ticker == asset2:
                     pnl = (position.open_price - p2) * position.n_shares
-                    comission = p2 * position.n_shares * COM
-                    cash += pnl - comission
+                    commission = p2 * position.n_shares * COM
+                    cash += pnl - commission
                     position.close_price = p2
-            #Quitar posición porque ya se cerró
-            active_short_ops.remove(position)
+                    pnl_history.append(pnl)
+                #Quitar posición porque ya se cerró
+                active_short_ops.remove(position)
 
     return cash, portfolio_value[-1], active_long_ops, active_short_ops
 
