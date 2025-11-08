@@ -1,3 +1,6 @@
+from ftplib import parse150
+from time import process_time_ns
+
 import numpy as np
 import pandas as pd
 from matplotlib.dates import DAYS_PER_YEAR
@@ -39,17 +42,13 @@ def backtest(df: pd.DataFrame, window_size:int,
     hedge_ratio_list, spreads_list = [], []
 
     # Kalman 2
-    e1_hat_list,e2_hat_list, vecms_hat = [], [], []
+    e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
     # Inicialización
-    init_window = df.iloc[:window_size, [0,1]]
-    init_johansen = coint_johansen(init_window, det_order=0, k_ar_diff=1)
-    w = init_johansen.evec[:, 0].reshape(-1, 1)
-    P = np.eye(2) * 10  # Covarianza inicial
-    Q = np.eye(2) * q  # Ruido proceso
-    R = np.eye(2) * r  # Ruido observación
-    vecm_norm = 0.0
-
-
+    w = np.zeros((2,1), dtype=float)
+    p0 = 10
+    P = np.eye(2) * p0
+    Q = np.eye(2) * q
+    R = r
 
     for i, row in enumerate(df.itertuples(index=True)):
         p1 = getattr(row, asset1)
@@ -69,56 +68,47 @@ def backtest(df: pd.DataFrame, window_size:int,
 
 
         # ACTUALIZAR KALMAN 2
-        if i >= window_size:
-            window = df.iloc[i-window_size:i, [0,1]].copy()
-            x = window[asset1].values
-            y = window[asset2].values
+        w_pred = w
+        P_pred = P + Q
 
-            # OBSERVACIÓN
-            johansen = coint_johansen(window, det_order=0, k_ar_diff=1)
-            eigenvector = johansen.evec[:, 0].reshape(-1, 1) # Estado inicial es el EIGENVECTOR
+        # OBSERVACIÓN
+        C_t = np.array([[y_t, x_t]])
+        epsilon_t = spread_t
 
-            # PREDICCIÓN
-            w_pred = w                    # w_t = w_{t-1} + n_t
-            P_pred = P + Q
+        # INNOVACIÓN
+        innovation = epsilon_t - float(C_t @ w_pred)
+        S_t = float(C_t @P_pred @ C_t.T + R)
+        K_t = (P_pred @ C_t.T) / S_t
 
-            # ACTUALIZACIÓN
-            innovation = eigenvector - w_pred
-            S = P_pred + R                   # Covarianza de innovación
-            K = P_pred @ np.linalg.pinv(S)    # Ganancia de KALMAN
-            w = w_pred + K @ innovation      # Eigenvector filtrado
-            P = (np.eye(2) - K) @ P_pred
+        # ACTUALIZACIÓN
+        w = w_pred + K_t * innovation
+        P = (np.eye(2) - K_t @ C_t) @ P_pred
 
-            # GUARDADO RESULTADOS
-            e1_hat, e2_hat = float(w[0]), float(w[1])
-            e1_hat_list.append(e1_hat)
-            e2_hat_list.append(e2_hat)
+        # GUARDAR RESULTADOS
+        e1, e2 = float(w[0]), float(w[1])
+        vecm_hat = y_t * e1 + x_t * e2
+        e1_hat_list.append(e1)
+        e2_hat_list.append(e2)
+        vecms_hat_list.append(vecm_hat)
 
-            # VECM filtrado (hat)
-            vecm_hat = e1_hat * p1 + e2_hat * p2
-            vecms_hat.append(vecm_hat)
-            vecms_sample = np.array(vecms_hat[-252:])
+        # NORMALIZAR VECM PARA OBTENER SEÑALES
+        if i > 252:
+            vecm = float(vecms_hat_list[-1])
+            mu = np.mean(vecms_hat_list[max(0, i - window_size):i])
+            std = np.std(vecms_hat_list[max(0, i - window_size):i])
+            vecm_norm = (vecm - mu) / (std + 1e-12)
+            vecm_norm = float(vecm_norm)
+        else:
+            vecm_norm = 0
 
-
-            ### NORMALIZACIÓN DEL VECM
-            if len(vecms_sample) >= 252:
-                mu = np.mean(vecms_sample)
-                std = np.std(vecms_sample)
-                vecm_norm = (vecm_hat - mu) / (std)
-            else:
-                vecm_norm = 0
-
-
-            # GENERACIÓN DE SEÑALES
-            if vecm_norm > theta:
-                signal = -1
-                signals.append(signal)
-            elif vecm_norm < -theta:
-                signal = 1
-                signals.append(signal)
-            else:
-                signal = 0
-
+        # OBTENER SEÑALES
+        if vecm_norm > theta:
+            signal = -1
+        elif vecm_norm < -theta:
+            signal = 1
+        else:
+            signal = 0
+        signals.append(signal)
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
@@ -228,15 +218,17 @@ def backtest(df: pd.DataFrame, window_size:int,
                 #Quitar posición porque ya se cerró
                 active_short_ops.remove(position)
 
-    plot_portfolio_evolution(portfolio_value, entry_long_idx, entry_short_idx, exit_idx)
-
     results_df = pd.DataFrame({
         'e1_hat': e1_hat_list,
         'e2_hat': e2_hat_list,
-        'vecm_hat': vecms_hat
+        'vecm_hat': vecms_hat_list,
     }, index=df.index[-len(e1_hat_list):])
 
     print(results_df.describe())
+
+    print(e1_hat_list[-252:])
+    print(e2_hat_list[-252:])
+    print(vecms_hat_list[-252:])
 
     return cash, portfolio_value[-1], active_long_ops, active_short_ops
 
