@@ -12,7 +12,7 @@ from utils import clean_prices, split_dfs, extract_pairs_all
 CORR_THRESHOLD = 0.6
 THETA = 0.5
 WINDOW = 252
-Q = 1e-5
+Q = 1e-8
 R = 1e-2
 
 # Pre-processing data
@@ -36,7 +36,8 @@ johansen_results = run_johansen_test(train_df, ols_adf_results, save_path=f'data
 
 # -- SELECCIÓN DEL PAR --
 # Obtain cointegrated pairs
-
+pair1_df = extract_pair(train_df, johansen_results, 0)
+pair2_df = extract_pair(train_df, johansen_results, 1)
 pair1_train_df, pair2_train_df, pair1_test_df, pair2_test_df, pair1_val_df, pair2_val_df = extract_pairs_all(train_df, test_df, val_df, johansen_results, [0,1])
 #plot_normalized_prices(pair1_df)
 #plot_normalized_prices(pair2_df)
@@ -46,6 +47,7 @@ cash_p1_train, last_value_p1_train, longs_p1_train, shorts_p1_train = backtest(p
 print(f"💰 Capital final: {cash_p1_train:,.2f}")
 print(f"📊 Valor final portafolio: {last_value_p1_train:,.2f}")
 print(f"🔵 Largos activos: {len(longs_p1_train)} | 🔴 Cortos activos: {len(shorts_p1_train)}")
+
 
 
 

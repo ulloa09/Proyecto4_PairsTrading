@@ -5,6 +5,7 @@ from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 from functions import get_portfolio_value
+from graphs import plot_portfolio_evolution
 from kalman_hedge import KalmanFilterReg
 from objects import Operation
 
@@ -27,6 +28,7 @@ def backtest(df: pd.DataFrame, window_size:int,
     active_short_ops: list[Operation] = []
     signals = []
     pnl_history = []
+    entry_long_idx, entry_short_idx, exit_idx = [], [], []
 
     # Obtener nombres de activos
     asset1, asset2 = df.columns[:2]
@@ -93,9 +95,10 @@ def backtest(df: pd.DataFrame, window_size:int,
             e2_hat_list.append(e2_hat)
 
             # VECM filtrado (hat)
-            vecm_hat = e1_hat * y_t + e2_hat * x_t
+            vecm_hat = e1_hat * p1 + e2_hat * p2
             vecms_hat.append(vecm_hat)
-            vecms_sample = vecms_hat[-252:]
+            vecms_sample = np.array(vecms_hat[-252:])
+
 
             ### NORMALIZACIÓN DEL VECM
             if len(vecms_sample) >= 252:
@@ -104,6 +107,7 @@ def backtest(df: pd.DataFrame, window_size:int,
                 vecm_norm = (vecm_hat - mu) / (std)
             else:
                 vecm_norm = 0
+
 
             # GENERACIÓN DE SEÑALES
             if vecm_norm > theta:
@@ -129,13 +133,13 @@ def backtest(df: pd.DataFrame, window_size:int,
 
         #  APERTURA OPERACIÓN ( VECM NORM > THETA ) LONG ASSET1 / SHORT ASSET 2
         if (vecm_norm > theta) and (len(active_long_ops) == 0) and (len(active_short_ops) == 0):
-
+            entry_long_idx.append(i)
             available = cash * 0.4
             # ASSET1 es el activo barato, se hace LONG
-            n_shares_long = available // (p1 * (1+COM))
-            costo = n_shares_long * (p1 * (1+COM))
+            n_shares_long = available // (p1 * (1 + COM))
+            costo = n_shares_long * p1 * (1+COM)
             # ASSET2 es el activo caro, se hace SHORT
-            n_shares_short = available * abs(hedge_ratio)
+            n_shares_short = int(n_shares_long * abs(hedge_ratio))
             cost_short = p2 * n_shares_short * COM
 
             ## COMPRA DEL ACTIVO 1
@@ -154,15 +158,17 @@ def backtest(df: pd.DataFrame, window_size:int,
                 active_short_ops.append(short_op)
 
 
+
         # APERTURA OPERACIÓN ( VECM NORM < -THETA )
         if (vecm_norm < -theta) and (len(active_long_ops) == 0) and (len(active_short_ops) == 0):
+            entry_short_idx.append(i)
             ## COMPRA DEL ACTIVO 2
             available = cash * 0.4
             # Ahora P1 es el activo caro, se hace SHORT
             n_shares_short = available // (p1 * (1+COM))
-            cost_short = n_shares_short * (p1 * (1+COM))
+            cost_short = n_shares_short * p1 * (1+COM)
             # P2 es el activo barato, se hace LONG
-            n_shares_long = available * abs(hedge_ratio)
+            n_shares_long = int(available * abs(hedge_ratio))
             costo = p2 * n_shares_long * COM
 
             ## COMPRA DEL ACTIVO 2
@@ -189,6 +195,7 @@ def backtest(df: pd.DataFrame, window_size:int,
         # LARGAS
         for position in active_long_ops.copy():
             if abs(vecm_norm) < 0.05:
+                exit_idx.append(i)
                 if position.ticker == asset1:
                     pnl = (p1 - position.open_price)
                     cash += p1 * position.n_shares * (1-COM)
@@ -204,6 +211,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
         for position in active_short_ops.copy():
             if abs(vecm_norm) < 0.05:
+                exit_idx.append(i)
                 if position.ticker == asset1:
                     pnl = (position.open_price - p1) * position.n_shares
                     commission = p1 * position.n_shares * COM
@@ -219,6 +227,16 @@ def backtest(df: pd.DataFrame, window_size:int,
                     pnl_history.append(pnl)
                 #Quitar posición porque ya se cerró
                 active_short_ops.remove(position)
+
+    plot_portfolio_evolution(portfolio_value, entry_long_idx, entry_short_idx, exit_idx)
+
+    results_df = pd.DataFrame({
+        'e1_hat': e1_hat_list,
+        'e2_hat': e2_hat_list,
+        'vecm_hat': vecms_hat
+    }, index=df.index[-len(e1_hat_list):])
+
+    print(results_df.describe())
 
     return cash, portfolio_value[-1], active_long_ops, active_short_ops
 

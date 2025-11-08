@@ -248,4 +248,47 @@ def plot_vecm_signals(df_kalman2, theta=1.8):
     plt.tight_layout()
     plt.show()
 
-    return fig
+
+def plot_portfolio_evolution(portfolio_values: list[float],
+                             long_entries: list[int],
+                             short_entries: list[int],
+                             exits: list[int],
+                             title: str = "Evolución del Portafolio"):
+    """
+    Grafica la evolución del portafolio y marca las operaciones (entradas/salidas).
+
+    Parámetros
+    ----------
+    portfolio_values : list[float]
+        Lista con el valor diario del portafolio.
+    long_entries : list[int]
+        Índices (o días) donde se abrieron operaciones LONG.
+    short_entries : list[int]
+        Índices (o días) donde se abrieron operaciones SHORT.
+    exits : list[int]
+        Índices (o días) donde se cerraron operaciones.
+    title : str, opcional
+        Título del gráfico.
+    """
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(portfolio_values, label="Valor del Portafolio", color="black", linewidth=1.5)
+
+    # Marcar entradas y salidas
+    if long_entries:
+        plt.scatter(long_entries, [portfolio_values[i] for i in long_entries],
+                    color="green", marker="^", s=80, label="Entrada LONG", zorder=5)
+    if short_entries:
+        plt.scatter(short_entries, [portfolio_values[i] for i in short_entries],
+                    color="red", marker="v", s=80, label="Entrada SHORT", zorder=5)
+    if exits:
+        plt.scatter(exits, [portfolio_values[i] for i in exits],
+                    color="blue", marker="o", s=60, label="Cierre", zorder=5)
+
+    plt.title(title)
+    plt.xlabel("Días / Iteraciones")
+    plt.ylabel("Valor del Portafolio ($)")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.show()
