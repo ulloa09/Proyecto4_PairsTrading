@@ -7,12 +7,13 @@ from graphs import plot_splits, plot_normalized_prices, plot_spreads, \
 from kalman_hedge import run_kalman_on_pair, KalmanFilterReg
 from kalman_spread import run_kalman2_vecm
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
-from utils import clean_prices, split_dfs
+from utils import clean_prices, split_dfs, extract_pairs_all
 
 CORR_THRESHOLD = 0.6
-THETA = 2
+THETA = 1
 WINDOW = 252
-
+Q = 1e-5
+R = 1e-2
 
 # Pre-processing data
 data = pd.read_csv('data/raw_prices.csv')
@@ -35,10 +36,18 @@ johansen_results = run_johansen_test(train_df, ols_adf_results, save_path=f'data
 
 # -- SELECCIÓN DEL PAR --
 # Obtain cointegrated pairs
-pair1_df = extract_pair(train_df, johansen_results, index=0)
-pair2_df = extract_pair(train_df, johansen_results, index=1)
+
+pair1_train_df, pair2_train_df, pair1_test_df, pair2_test_df, pair1_val_df, pair2_val_df = extract_pairs_all(train_df, test_df, val_df, johansen_results, [0,1])
 #plot_normalized_prices(pair1_df)
 #plot_normalized_prices(pair2_df)
+
+# PRUEBA BACKTESTING
+cash_p1_train, last_value_p1_train, longs_p1_train, shorts_p1_train = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
+print(f"💰 Capital final: {cash_p1_train:,.2f}")
+print(f"📊 Valor final portafolio: {last_value_p1_train:,.2f}")
+print(f"🔵 Largos activos: {len(longs_p1_train)} | 🔴 Cortos activos: {len(shorts_p1_train)}")
+
+
 
 '''
 # -- FILTROS DE KALMAN --
@@ -62,28 +71,3 @@ plot_vecm_signals(kalman2_pair1)
 plot_vecm_signals(kalman2_pair2)
 '''
 
-# Suponiendo que df tiene tus dos activos
-asset1, asset2 = pair1_df.columns[:2]
-y, x = pair1_df[asset1].values, pair1_df[asset2].values
-
-kf = KalmanFilterReg(q=1e-5, r=1e-2)
-
-alphas, betas, spreads = [], [], []
-
-for y_t, x_t in zip(y, x):
-    kf.predict()
-    a, b, s = kf.update(y_t, x_t)
-    alphas.append(a)
-    betas.append(b)
-    spreads.append(s)
-
-plt.figure(figsize=(10,4))
-plt.plot(betas, label='β_t (hedge ratio)')
-plt.title(f'Hedge ratio dinámico: {asset1}-{asset2}')
-plt.legend()
-plt.show()
-
-cash, portfolio_value, longs, shorts = backtest(test_df.head(300), window_size=252,
-                                                theta=1.8, q=1e-5, r=1e-2)
-
-print(cash, portfolio_value, longs, shorts)

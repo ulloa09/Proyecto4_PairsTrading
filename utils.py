@@ -65,3 +65,43 @@ def split_dfs(data: pd.DataFrame, train: int, test: int, validation: int) -> tup
     validation_df.to_csv('data/validation.csv')
 
     return train_df, test_df, validation_df
+
+def extract_pairs_all(train_df: pd.DataFrame,
+                      test_df: pd.DataFrame,
+                      val_df: pd.DataFrame,
+                      johansen_df: pd.DataFrame,
+                      indices: list[int]):
+    """
+    Extrae los pares (según índices en johansen_df)
+    para train, test y val y los devuelve directamente como DataFrames.
+
+    Parámetros
+    ----------
+    train_df, test_df, val_df : DataFrame
+        Con precios (columnas = tickers, filas = fechas).
+    johansen_df : DataFrame
+        Resultados de cointegración con columnas ['Asset_1', 'Asset_2'].
+    indices : list[int]
+        Índices (filas) de los pares seleccionados en johansen_df.
+
+    Devuelve
+    --------
+    tuple
+        DataFrames en orden:
+        (pair0_train_df, pair1_train_df, ..., pairN_train_df,
+         pair0_test_df,  pair1_test_df,  ..., pairN_test_df,
+         pair0_val_df,   pair1_val_df,   ..., pairN_val_df)
+    """
+
+    def extract_pair(df, index):
+        """Extrae un par específico según índice de johansen_df."""
+        asset1 = johansen_df.loc[index, "Asset_1"]
+        asset2 = johansen_df.loc[index, "Asset_2"]
+        return df[[asset1, asset2]].dropna()
+
+    train_pairs = [extract_pair(train_df, idx) for idx in indices]
+    test_pairs  = [extract_pair(test_df, idx)  for idx in indices]
+    val_pairs   = [extract_pair(val_df, idx)   for idx in indices]
+
+    # Desempaquetar todos en un solo tuple
+    return (*train_pairs, *test_pairs, *val_pairs)
