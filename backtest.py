@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 
 from functions import get_portfolio_value
-from graphs import plot_portfolio_evolution
+from graphs import plot_portfolio_evolution, plot_dynamic_eigenvectors
 from kalman_hedge import KalmanFilterReg
 from kalman_spread import KalmanFilterVecm
 from objects import Operation
@@ -64,14 +65,19 @@ def backtest(df: pd.DataFrame, window_size:int,
             # 1️⃣ Cointegración móvil
             window_data = df.iloc[i - 252:i, :2]
             eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
-            e1, e2 = eig.evec[:, 0]
+            # Eigenvector sin normalización
+            v = eig.evec[:, 0].astype(float)
+            e1, e2 = v
 
-            # 2️⃣ VECM observado
+            # Precios originales sin centrar
+            # 2️⃣ VECM observado con datos originales
             vecm = e1 * y_t + e2 * x_t
 
             # 3️⃣ Actualizar Kalman 2 con precios y vecm observado
             kalman_2.predict()
-            e1_hat, e2_hat, vecm_hat = kalman_2.update(p2_t=x_t ,p1_t=y_t, eps_t=vecm)
+            e1_hat, e2_hat, vecm_hat = kalman_2.update(y_t, x_t, vecm)
+
+            # Sin normalización del estado estimado
 
             # 4️⃣ Guardar resultados
             e1_hat_list.append(e1_hat)
@@ -87,14 +93,10 @@ def backtest(df: pd.DataFrame, window_size:int,
             else:
                 vecm_norm = 0.0
 
-            # Seguridad numérica
-            if np.isnan(vecm_norm) or np.isinf(vecm_norm):
-                vecm_norm = 0.0
-
         else:
-            e1_hat_list.append(0)
-            e2_hat_list.append(0)
-            vecms_hat_list.append(0)
+            e1_hat_list.append(0.0)
+            e2_hat_list.append(0.0)
+            vecms_hat_list.append(0.0)
             vecm_norm = 0.0
 
 
@@ -217,6 +219,8 @@ def backtest(df: pd.DataFrame, window_size:int,
     print(e1_hat_list[-10:])
     print(e2_hat_list[-10:])
     print(vecms_hat_list[-10:])
+
+    plot_dynamic_eigenvectors(results_df)
 
     return cash, portfolio_value[-1], active_long_ops, active_short_ops
 

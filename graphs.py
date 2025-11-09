@@ -190,10 +190,10 @@ def plot_vecm_mean(df_kalman2):
     plt.show()
 
 
-def plot_dynamic_eigenvectors(df_kalman2):
+def plot_dynamic_eigenvectors(df):
     plt.figure(figsize=(10, 4))
-    plt.plot(df_kalman2.index, df_kalman2["v1_t"], label="v₁ₜ", color='teal')
-    plt.plot(df_kalman2.index, df_kalman2["v2_t"], label="v₂ₜ", color='orange')
+    plt.plot(df.index, df["e1_hat"], label="v₁ₜ", color='teal')
+    plt.plot(df.index, df["e2_hat"], label="v₂ₜ", color='orange')
     plt.title("Eigenvectores dinámicos estimados (Kalman 2)")
     plt.xlabel("Fecha")
     plt.ylabel("Valor")

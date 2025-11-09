@@ -13,7 +13,7 @@ CORR_THRESHOLD = 0.6
 THETA = 0.5
 WINDOW = 252
 Q = 1e-6
-R = 1e-3
+R = 1e-2
 
 # Pre-processing data
 data = pd.read_csv('data/raw_prices.csv')
