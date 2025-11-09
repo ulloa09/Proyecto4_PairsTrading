@@ -42,6 +42,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Kalman 2
     kalman_2 = KalmanFilterVecm(q=q, r=r)
+    v_prev = np.zeros(2)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
 
     for i, row in enumerate(df.itertuples(index=True)):
@@ -65,9 +66,15 @@ def backtest(df: pd.DataFrame, window_size:int,
             # 1️⃣ Cointegración móvil
             window_data = df.iloc[i - 252:i, :2]
             eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
-            # Eigenvector sin normalización
+            # Eigenvector sin normalizar
             v = eig.evec[:, 0].astype(float)
+
+            # Corrige solo el signo para que sea consistente en el tiempo
+            if v_prev is not None and np.dot(v, v_prev) < 0:
+                v = -v
+
             e1, e2 = v
+            v_prev = v.copy()
 
             # Precios originales sin centrar
             # 2️⃣ VECM observado con datos originales
