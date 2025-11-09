@@ -1,6 +1,42 @@
 import numpy as np
 import pandas as pd
 
+class KalmanFilterVecm:
+    """
+    Kalman filter para la estimación dinámica de los eigenvectores (e1_t, e2_t)
+    del modelo cointegrante:
+        ε_t = e1_t * p1_t + e2_t * p2_t + ν_t
+    """
+    def __init__(self, q=1e-5, r=1e-2):
+        self.w = np.zeros((2,1))
+        self.P = np.eye(2)
+        self.q = q
+        self.r = r
+        self.A = np.eye(2)
+
+    def predict(self):
+        self.w = self.A @ self.w
+        self.P = self.A @ self.P @ self.A.T + self.q * np.eye(2)
+
+    def update(self, p1_t: float, p2_t: float, eps_t: float):
+        # Vector de observación (precios)
+        C_t = np.array([[p1_t, p2_t]])
+        # Predicción del VECM
+        eps_pred = float(C_t @ self.w)
+        # Innovación
+        e_t = eps_t - eps_pred
+        # Varianza de la innovación
+        S_t = C_t @ self.P @ C_t.T + self.r
+        # Ganancia de Kalman
+        K_t = self.P @ C_t.T / S_t
+        # Actualización del estado
+        self.w = self.w + K_t * e_t
+        self.P = (np.eye(2) - K_t @ C_t) @ self.P
+
+        e1_t, e2_t = float(self.w[0]), float(self.w[1])
+        eps_hat_t = p1_t * e1_t + p2_t * e2_t
+        return e1_t, e2_t, eps_hat_t
+
 def run_kalman2_vecm(kalman1_df: pd.DataFrame,
                            johansen_df: pd.DataFrame,
                            q: float = 1e-6,

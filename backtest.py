@@ -1,15 +1,13 @@
-from ftplib import parse150
-from time import process_time_ns
-
 import numpy as np
 import pandas as pd
-from matplotlib.dates import DAYS_PER_YEAR
 from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
+
 
 from functions import get_portfolio_value
 from graphs import plot_portfolio_evolution
 from kalman_hedge import KalmanFilterReg
+from kalman_spread import KalmanFilterVecm
 from objects import Operation
 
 
@@ -42,13 +40,8 @@ def backtest(df: pd.DataFrame, window_size:int,
     hedge_ratio_list, spreads_list = [], []
 
     # Kalman 2
+    kalman_2 = KalmanFilterVecm(q=q, r=r)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
-    # Inicialización
-    w = np.zeros((2,1), dtype=float)
-    p0 = 10
-    P = np.eye(2) * p0
-    Q = np.eye(2) * q
-    R = r
 
     for i, row in enumerate(df.itertuples(index=True)):
         p1 = getattr(row, asset1)
@@ -66,49 +59,44 @@ def backtest(df: pd.DataFrame, window_size:int,
         hedge_ratio_list.append(hedge_ratio)
         spreads_list.append(spread_t)
 
-
         # ACTUALIZAR KALMAN 2
-        w_pred = w
-        P_pred = P + Q
-
-        # OBSERVACIÓN
-        C_t = np.array([[y_t, x_t]])
-        epsilon_t = spread_t
-
-        # INNOVACIÓN
-        innovation = epsilon_t - float(C_t @ w_pred)
-        S_t = float(C_t @P_pred @ C_t.T + R)
-        K_t = (P_pred @ C_t.T) / S_t
-
-        # ACTUALIZACIÓN
-        w = w_pred + K_t * innovation
-        P = (np.eye(2) - K_t @ C_t) @ P_pred
-
-        # GUARDAR RESULTADOS
-        e1, e2 = float(w[0]), float(w[1])
-        vecm_hat = y_t * e1 + x_t * e2
-        e1_hat_list.append(e1)
-        e2_hat_list.append(e2)
-        vecms_hat_list.append(vecm_hat)
-
-        # NORMALIZAR VECM PARA OBTENER SEÑALES
         if i > 252:
-            vecm = float(vecms_hat_list[-1])
-            mu = np.mean(vecms_hat_list[max(0, i - window_size):i])
-            std = np.std(vecms_hat_list[max(0, i - window_size):i])
-            vecm_norm = (vecm - mu) / (std + 1e-12)
-            vecm_norm = float(vecm_norm)
-        else:
-            vecm_norm = 0
+            # 1️⃣ Cointegración móvil
+            window_data = df.iloc[i - 252:i, :2]
+            eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
+            e1, e2 = eig.evec[:, 0]
 
-        # OBTENER SEÑALES
-        if vecm_norm > theta:
-            signal = -1
-        elif vecm_norm < -theta:
-            signal = 1
+            # 2️⃣ VECM observado
+            vecm = e1 * y_t + e2 * x_t
+
+            # 3️⃣ Actualizar Kalman 2 con precios y vecm observado
+            kalman_2.predict()
+            e1_hat, e2_hat, vecm_hat = kalman_2.update(p2_t=x_t ,p1_t=y_t, eps_t=vecm)
+
+            # 4️⃣ Guardar resultados
+            e1_hat_list.append(e1_hat)
+            e2_hat_list.append(e2_hat)
+            vecms_hat_list.append(vecm_hat)
+
+            # 5️⃣ Normalizar vecm_hat (solo si hay suficiente historia)
+            if len(vecms_hat_list) > 252:
+                vecms_sample = vecms_hat_list[-252:]
+                mu = np.mean(vecms_sample)
+                std = np.std(vecms_sample)
+                vecm_norm = (vecm_hat - mu) / (std + 1e-12)
+            else:
+                vecm_norm = 0.0
+
+            # Seguridad numérica
+            if np.isnan(vecm_norm) or np.isinf(vecm_norm):
+                vecm_norm = 0.0
+
         else:
-            signal = 0
-        signals.append(signal)
+            e1_hat_list.append(0)
+            e2_hat_list.append(0)
+            vecms_hat_list.append(0)
+            vecm_norm = 0.0
+
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
@@ -226,9 +214,9 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     print(results_df.describe())
 
-    print(e1_hat_list[-252:])
-    print(e2_hat_list[-252:])
-    print(vecms_hat_list[-252:])
+    print(e1_hat_list[-10:])
+    print(e2_hat_list[-10:])
+    print(vecms_hat_list[-10:])
 
     return cash, portfolio_value[-1], active_long_ops, active_short_ops
 

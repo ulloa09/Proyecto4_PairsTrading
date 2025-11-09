@@ -12,8 +12,8 @@ from utils import clean_prices, split_dfs, extract_pairs_all
 CORR_THRESHOLD = 0.6
 THETA = 0.5
 WINDOW = 252
-Q = 1e-8
-R = 1e-2
+Q = 1e-6
+R = 1e-3
 
 # Pre-processing data
 data = pd.read_csv('data/raw_prices.csv')
