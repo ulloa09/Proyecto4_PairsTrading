@@ -90,14 +90,17 @@ def backtest(df: pd.DataFrame, window_size:int,
                 mu = np.mean(vecms_sample)
                 std = np.std(vecms_sample)
                 vecm_norm = (vecm_hat - mu) / (std + 1e-12)
+                vecms_hatnorm_list.append(vecm_norm)
             else:
                 vecm_norm = 0.0
+                vecms_hatnorm_list.append(vecm_norm)
 
         else:
             e1_hat_list.append(0.0)
             e2_hat_list.append(0.0)
             vecms_hat_list.append(0.0)
             vecm_norm = 0.0
+            vecms_hatnorm_list.append(0.0)
 
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
@@ -209,9 +212,12 @@ def backtest(df: pd.DataFrame, window_size:int,
                 active_short_ops.remove(position)
 
     results_df = pd.DataFrame({
+        'spread': spreads_list,
         'e1_hat': e1_hat_list,
         'e2_hat': e2_hat_list,
         'vecm_hat': vecms_hat_list,
+        'hedge_ratio': hedge_ratio_list,
+        'vecm_norm': vecms_hatnorm_list
     }, index=df.index[-len(e1_hat_list):])
 
     print(results_df.describe())
@@ -222,13 +228,19 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     plot_dynamic_eigenvectors(results_df)
 
-    return cash, portfolio_value[-1], active_long_ops, active_short_ops
+    plt.figure(figsize=(10, 5))
+    plt.plot(results_df["hedge_ratio"], label="Hedge Ratio β_t")
+    plt.title("Evolución del Hedge Ratio (Kalman 1)")
+    plt.xlabel("Fecha")
+    plt.ylabel("β_t")
+    plt.legend()
+    plt.show()
 
+    plt.figure(figsize=(10, 5))
+    plt.plot(results_df["spread"], label="Spread (Kalman 1)")
+    plt.plot(results_df["vecm_norm"], label="VECM (Kalman 2)", alpha=0.7)
+    plt.title("Comparación Spread vs VECM estimado")
+    plt.legend();
+    plt.show()
 
-
-
-
-
-
-
-
+    return cash, portfolio_value[-1]
