@@ -11,7 +11,7 @@ from utils import clean_prices, split_dfs, extract_pairs_all
 
 CORR_THRESHOLD = 0.6
 THETA = 2
-WINDOW = 252
+WINDOW = 20
 Q = 1e-7
 R = 3e-2
 
@@ -24,7 +24,7 @@ print(f"Tickers utilizados:\n{data.columns.values}")
 
 
 # Encontrar pares correlacionados
-correlated_pairs = find_correlated_pairs(train_df, window=WINDOW, threshold=CORR_THRESHOLD)
+correlated_pairs = find_correlated_pairs(train_df, window=252, threshold=CORR_THRESHOLD)
 correlated_pairs.to_csv('data/correlated_pairs.csv', index=False)
 
 # -- PRUEBAS DE COINTEGRACIÓN --
@@ -45,12 +45,13 @@ pair1_train_df, pair2_train_df, pair1_test_df, pair2_test_df, pair1_val_df, pair
 
 # PRUEBA BACKTESTING
 #cash_p1_train, last_value_p1_train = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
-cash_p1_train, portfolio_value = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
-print(f"💰 Capital final: {cash_p1_train:,.2f}")
+cash, port_value = backtest(pair2_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
+print(f"💰 Capital final: {port_value[-1]:,.2f}")
 #print(f"📊 Valor final portafolio: {last_value_p1_train:,.2f}")
 
-plt.figure()
-plt.plot(portfolio_value)
+plt.figure(figsize=(12,6))
+plt.plot(port_value, label='Portfolio Value')
+plt.grid()
 plt.show()
 
 

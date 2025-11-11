@@ -62,9 +62,9 @@ def backtest(df: pd.DataFrame, window_size:int,
         spreads_list.append(spread_t)
 
         # ACTUALIZAR KALMAN 2
-        if i > 252:
+        if i > window_size:
             # 1️⃣ Cointegración móvil
-            window_data = df.iloc[i - 252:i,:]
+            window_data = df.iloc[i - window_size:i,:]
             eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
             # Eigenvector sin normalizar
             v = eig.evec[:, 0].astype(float)
@@ -87,8 +87,8 @@ def backtest(df: pd.DataFrame, window_size:int,
             vecms_hat_list.append(vecm_hat)
 
             # 5️⃣ Normalizar vecm_hat (solo si hay suficiente historia)
-            if len(vecms_hat_list) > 252:
-                vecms_sample = vecms_hat_list[-252:]
+            if len(vecms_hat_list) > window_size:
+                vecms_sample = vecms_hat_list[-window_size:]
                 mu = np.mean(vecms_sample)
                 std = np.std(vecms_sample)
                 vecm_norm = (vecm_hat - mu) / (std)
