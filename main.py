@@ -10,7 +10,7 @@ from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, 
 from utils import clean_prices, split_dfs, extract_pairs_all
 
 CORR_THRESHOLD = 0.6
-THETA = 0.5
+THETA = 2
 WINDOW = 252
 Q = 1e-7
 R = 3e-2
@@ -44,12 +44,14 @@ pair1_train_df, pair2_train_df, pair1_test_df, pair2_test_df, pair1_val_df, pair
 
 
 # PRUEBA BACKTESTING
-cash_p1_train, last_value_p1_train = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
+#cash_p1_train, last_value_p1_train = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
+cash_p1_train, portfolio_value = backtest(pair1_train_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
 print(f"💰 Capital final: {cash_p1_train:,.2f}")
-print(f"📊 Valor final portafolio: {last_value_p1_train:,.2f}")
+#print(f"📊 Valor final portafolio: {last_value_p1_train:,.2f}")
 
-
-
+plt.figure()
+plt.plot(portfolio_value)
+plt.show()
 
 
 '''

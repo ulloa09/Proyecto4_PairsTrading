@@ -42,7 +42,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Kalman 2
     kalman_2 = KalmanFilterVecm(q=q, r=r)
-    v_prev = np.zeros(2)
+    #v_prev = np.zeros(2)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
 
     for i, row in enumerate(df.itertuples(index=True)):
@@ -50,11 +50,11 @@ def backtest(df: pd.DataFrame, window_size:int,
         p2 = getattr(row, asset2)
 
         # ACTUALIZAR KALMAN 1
-        y_t = p1
-        x_t = p2
+        x_t = p1
+        y_t = p2
 
         kalman_1.predict()
-        alpha_t, beta_t, spread_t = kalman_1.update(y_t, x_t)
+        alpha_t, beta_t, spread_t = kalman_1.update(x_t, y_t)
         w0, w1 = alpha_t, beta_t
         hedge_ratio = w1  # <- hedge ratio (redundante)
 
@@ -64,25 +64,20 @@ def backtest(df: pd.DataFrame, window_size:int,
         # ACTUALIZAR KALMAN 2
         if i > 252:
             # 1️⃣ Cointegración móvil
-            window_data = df.iloc[i - 252:i, :2]
+            window_data = df.iloc[i - 252:i,:]
             eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
             # Eigenvector sin normalizar
             v = eig.evec[:, 0].astype(float)
 
-            # Corrige solo el signo para que sea consistente en el tiempo
-            if v_prev is not None and np.dot(v, v_prev) < 0:
-                v = -v
-
             e1, e2 = v
-            v_prev = v.copy()
 
             # Precios originales sin centrar
             # 2️⃣ VECM observado con datos originales
-            vecm = e1 * y_t + e2 * x_t
+            vecm = e1 * x_t + e2 * y_t
 
             # 3️⃣ Actualizar Kalman 2 con precios y vecm observado
             kalman_2.predict()
-            e1_hat, e2_hat, vecm_hat = kalman_2.update(y_t, x_t, vecm)
+            e1_hat, e2_hat, vecm_hat = kalman_2.update(x_t, y_t, vecm)
 
             # Sin normalización del estado estimado
 
@@ -96,7 +91,7 @@ def backtest(df: pd.DataFrame, window_size:int,
                 vecms_sample = vecms_hat_list[-252:]
                 mu = np.mean(vecms_sample)
                 std = np.std(vecms_sample)
-                vecm_norm = (vecm_hat - mu) / (std + 1e-12)
+                vecm_norm = (vecm_hat - mu) / (std)
                 vecms_hatnorm_list.append(vecm_norm)
             else:
                 vecm_norm = 0.0
@@ -158,7 +153,7 @@ def backtest(df: pd.DataFrame, window_size:int,
             n_shares_short = available // (p1 * (1+COM))
             cost_short = n_shares_short * p1 * (1+COM)
             # P2 es el activo barato, se hace LONG
-            n_shares_long = int(available * abs(hedge_ratio))
+            n_shares_long = int(n_shares_short * abs(hedge_ratio))
             costo = p2 * n_shares_long * COM
 
             ## COMPRA DEL ACTIVO 2
@@ -177,7 +172,7 @@ def backtest(df: pd.DataFrame, window_size:int,
                 active_short_ops.append(short_op)
 
         portfolio_value.append(get_portfolio_value(cash, active_long_ops, active_short_ops,
-                                                   x_ticker=asset1, y_ticker=asset2))
+                                                   x_ticker=asset1, y_ticker=asset2, p1=p1, p2=p2))
 
 
 
@@ -235,13 +230,6 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     plot_dynamic_eigenvectors(results_df)
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(results_df["hedge_ratio"], label="Hedge Ratio β_t")
-    plt.title("Evolución del Hedge Ratio (Kalman 1)")
-    plt.xlabel("Fecha")
-    plt.ylabel("β_t")
-    plt.legend()
-    plt.show()
 
     plt.figure(figsize=(10, 5))
     plt.plot(results_df["spread"], label="Spread (Kalman 1)")
@@ -250,4 +238,4 @@ def backtest(df: pd.DataFrame, window_size:int,
     plt.legend();
     plt.show()
 
-    return cash, portfolio_value[-1]
+    return cash, portfolio_value
