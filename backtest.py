@@ -223,7 +223,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     portfolio_series = pd.Series(portfolio_value, index=df.index[-len(portfolio_value):])
 
-    print(pnl_history)
+
     plot_hedge_ratio_evolution(results_df)
     plot_dynamic_eigenvectors(results_df)
     plot_normalized_prices(df)

@@ -110,7 +110,7 @@ def show_cointegration_summary(adf_df: pd.DataFrame,
 
     # Mostrar tabla legible
     print("\n=== Tabla resumen de correlaciones y cointegración ===\n")
-    print(merged.head(10))
+    print(merged.head(5))
 
     # Guardar CSV opcional
     if save_csv:
