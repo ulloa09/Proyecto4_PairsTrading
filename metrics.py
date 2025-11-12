@@ -90,9 +90,13 @@ def generate_metrics(portfolio_values: pd.Series, pnl_history: list[float]) -> d
         "Mean Daily Return": mean,
         "Std Daily Return": std,
     }
+    abs = ["Sharpe", "Sortino", "Calmar"]
 
     print("\n--- MÉTRICAS DE DESEMPEÑO ---")
     for k, v in metrics.items():
-        print(f"{k:20s}: {v:.4f}")
+        if k in abs:
+            print(f"{k:20s}: {v:.2f}")
+        else:
+            print(f"{k:20s}: {v*100:.2f}%")
 
     return metrics

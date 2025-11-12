@@ -90,8 +90,8 @@ def plot_vecm_signals(results_df: pd.DataFrame,
     y_exit  = [results_df["vecm_norm"].iloc[i] for i in exit_idx        if 0 <= i < len(results_df)]
 
     # --- Puntos de señal ---
-    ax.scatter(x_long,  y_long,  color="green",  marker="^", s=90, label="Entrada LONG")
-    ax.scatter(x_short, y_short, color="red",    marker="v", s=90, label="Entrada SHORT")
+    ax.scatter(x_long,  y_long,  color="red",  marker="v", s=90, label="Entrada LONG")
+    ax.scatter(x_short, y_short, color="green",    marker="^", s=90, label="Entrada SHORT")
     ax.scatter(x_exit,  y_exit,  color="black",  marker="x", s=70, label="Cierre")
 
     # --- Personalización ---
