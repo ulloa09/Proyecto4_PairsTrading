@@ -5,7 +5,8 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 
 from functions import get_portfolio_value
-from graphs import plot_dynamic_eigenvectors, plot_vecm_signals
+from graphs import plot_dynamic_eigenvectors, plot_vecm_signals, plot_spread_evolution, plot_portfolio_evolution, \
+    plot_spread_vs_vecm, plot_normalized_prices
 from kalman_filters import KalmanFilterReg, KalmanFilterVecm
 from metrics import generate_metrics
 from objects import Operation
@@ -214,28 +215,22 @@ def backtest(df: pd.DataFrame, window_size:int,
         'spread': spreads_list,
         'e1_hat': e1_hat_list,
         'e2_hat': e2_hat_list,
-        'vecm_hat': vecms_hat_list,
         'hedge_ratio': hedge_ratio_list,
+        'vecm_hat': vecms_hat_list,
         'vecm_norm': vecms_hatnorm_list,
         'portfolio_value': portfolio_value,
     }, index=df.index[-len(e1_hat_list):])
 
-    plot_dynamic_eigenvectors(results_df)
-    plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx,theta)
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(results_df["spread"], label="Spread (Kalman 1)")
-    plt.plot(results_df["vecm_norm"], label="VECM (Kalman 2)", alpha=0.7)
-    plt.title("Comparación Spread vs VECM estimado")
-    plt.legend()
-    plt.show()
-
     portfolio_series = pd.Series(portfolio_value, index=df.index[-len(portfolio_value):])
+
+    plot_dynamic_eigenvectors(results_df)
+    plot_normalized_prices(df)
+    plot_spread_evolution(results_df, asset2, asset1)
+    plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx, theta)
+    plot_portfolio_evolution(portfolio_series)
+    plot_spread_vs_vecm(results_df)
+
     metrics = generate_metrics(portfolio_series)
 
-    print("\n--- MÉTRICAS DE DESEMPEÑO ---")
-    for k, v in metrics.items():
-        print(f"{k:20s}: {v:.4f}")
 
-
-    return cash, portfolio_value
+    return cash, portfolio_value, metrics

@@ -38,12 +38,7 @@ pair2_val_df = extract_pair(val_df, johansen_results, 1)
 
 
 # BACKTESTING
-cash, port_value = backtest(pair2_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
+cash, port_value, metrics = backtest(pair2_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
 print(f"💰 Capital final: {port_value[-1]:,.2f}")
 print(f"💵 Cash restante: {cash:,.2f}\n")
 
-
-plt.figure(figsize=(12,6))
-plt.plot(port_value, label='Portfolio Value')
-plt.grid()
-plt.show()
