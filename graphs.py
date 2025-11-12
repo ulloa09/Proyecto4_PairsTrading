@@ -1,6 +1,7 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import alpha
+import seaborn as sns
 
 
 def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"):
@@ -229,3 +230,83 @@ def plot_spread_vs_vecm(results_df: pd.DataFrame):
     plt.tight_layout()
     plt.show()
 
+def plot_hedge_ratio_evolution(results_df: pd.DataFrame):
+    """
+    Grafica la evolución temporal de la razón de cobertura (hedge ratio) estimada por el Filtro de Kalman 1.
+
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        DataFrame con al menos la columna 'hedge_ratio' y un índice temporal.
+    """
+
+    if "hedge_ratio" not in results_df.columns:
+        raise ValueError("La columna 'hedge_ratio' no existe en results_df.")
+
+    plt.figure(figsize=(12, 5))
+    plt.plot(results_df.index, results_df["hedge_ratio"],
+             color="purple", linewidth=1.8, label="Razón de cobertura βₜ (Kalman 1)", alpha=0.8)
+
+    # Media y bandas ±1σ para visualizar estabilidad
+    mean_beta = results_df["hedge_ratio"].mean()
+    std_beta = results_df["hedge_ratio"].std()
+    plt.axhline(mean_beta, color="orange", linestyle="--", linewidth=1.5, label="Media de βₜ")
+
+    plt.title("Evolución de la Razón de Cobertura Dinámica (βₜ)", fontsize=13, weight='bold')
+    plt.xlabel("Fecha")
+    plt.ylabel("Hedge Ratio (βₜ)")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+def plot_trade_returns_distribution(pnl_history: list[float]):
+    """
+    Grafica la distribución de rendimientos por operación (histograma y estadísticos).
+
+    Parameters
+    ----------
+    pnl_history : list[float]
+        Lista con los rendimientos o ganancias/pérdidas por operación cerrada.
+    """
+
+    if not pnl_history:
+        print("⚠️ No hay operaciones cerradas para analizar la distribución de rendimientos.")
+        return
+
+
+
+    # Convertir a array
+    pnl_array = np.array(pnl_history)
+    mean_pnl = np.mean(pnl_array)
+    median_pnl = np.median(pnl_array)
+    std_pnl = np.std(pnl_array)
+    win_rate = np.sum(pnl_array > 0) / len(pnl_array)
+
+    # Crear histograma + densidad
+    plt.figure(figsize=(10, 5))
+    sns.histplot(pnl_array, bins=30, kde=True, color="steelblue", alpha=0.7)
+
+    # Líneas de referencia
+    plt.axvline(mean_pnl, color="orange", linestyle="--", lw=1.5, label=f"Media = {mean_pnl:.2f}")
+    plt.axvline(median_pnl, color="green", linestyle="--", lw=1.5, label=f"Mediana = {median_pnl:.2f}")
+    plt.axvline(0, color="black", linestyle=":", lw=1.2)
+
+    # Título y ejes
+    plt.title("Distribución de Rendimientos por Operación", fontsize=13, weight="bold")
+    plt.xlabel("PnL por operación ($)")
+    plt.ylabel("Frecuencia")
+    plt.legend()
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.show()
+
+    # Mostrar estadísticas resumidas
+    print("\n=== Estadísticas de Trading ===")
+    print(f"📊 Número de operaciones: {len(pnl_array)}")
+    print(f"✅ Tasa de aciertos (Win Rate): {win_rate*100:.2f}%")
+    print(f"💵 Media PnL: {mean_pnl:.2f}")
+    print(f"📈 Mediana PnL: {median_pnl:.2f}")
+    print(f"📉 Desviación estándar: {std_pnl:.2f}")
+    print(f"📊 Pérdida promedio: {np.mean(pnl_array[pnl_array<0]):.2f}")
+    print(f"📊 Ganancia promedio: {np.mean(pnl_array[pnl_array>0]):.2f}")

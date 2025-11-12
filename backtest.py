@@ -6,7 +6,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 from functions import get_portfolio_value
 from graphs import plot_dynamic_eigenvectors, plot_vecm_signals, plot_spread_evolution, plot_portfolio_evolution, \
-    plot_spread_vs_vecm, plot_normalized_prices
+    plot_spread_vs_vecm, plot_normalized_prices, plot_hedge_ratio_evolution, plot_trade_returns_distribution
 from kalman_filters import KalmanFilterReg, KalmanFilterVecm
 from metrics import generate_metrics
 from objects import Operation
@@ -107,12 +107,12 @@ def backtest(df: pd.DataFrame, window_size:int,
             if abs(vecm_norm) < 0.05:
                 exit_idx.append(i)
                 if position.ticker == asset1:
-                    pnl = (p1 - position.open_price)
+                    pnl = (p1 - position.open_price) * position.n_shares
                     cash += p1 * position.n_shares * (1 - COM)
                     position.close_price = p1
                     pnl_history.append(pnl)
                 if position.ticker == asset2:
-                    pnl = (p2 - position.open_price)
+                    pnl = (p2 - position.open_price) * position.n_shares
                     cash += p2 * position.n_shares * (1 - COM)
                     position.close_price = p2
                     pnl_history.append(pnl)
@@ -223,14 +223,17 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     portfolio_series = pd.Series(portfolio_value, index=df.index[-len(portfolio_value):])
 
-    plot_dynamic_eigenvectors(results_df)
-    plot_normalized_prices(df)
-    plot_spread_evolution(results_df, asset2, asset1)
-    plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx, theta)
-    plot_portfolio_evolution(portfolio_series)
-    plot_spread_vs_vecm(results_df)
+    print(pnl_history)
+    #plot_hedge_ratio_evolution(results_df)
+    #plot_dynamic_eigenvectors(results_df)
+    #plot_normalized_prices(df)
+    #plot_spread_evolution(results_df, asset2, asset1)
+    #plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx, theta)
+    #plot_portfolio_evolution(portfolio_series)
+    #plot_spread_vs_vecm(results_df)
+    plot_trade_returns_distribution(pnl_history)
 
-    metrics = generate_metrics(portfolio_series)
+    metrics = generate_metrics(portfolio_series, pnl_history)
 
 
     return cash, portfolio_value, metrics

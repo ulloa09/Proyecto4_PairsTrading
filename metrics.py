@@ -51,19 +51,21 @@ def annualized_sortino(mean: float, rets: pd.Series) -> float:
     return annual_rets / annual_down_std if annual_down_std > 0 else 0
 
 
-def win_rate(rets: pd.Series) -> float:
+def win_rate(pnl_history: list[float]) -> float:
     """
     Calcula la proporción de operaciones ganadoras (win rate).
     """
-    total = len(rets)
-    return (rets > 0).sum() / total if total > 0 else 0
+    pnl_array = np.array(pnl_history)
+    wins = np.sum(pnl_array > 0)
+    total = len(pnl_array)
+    return wins / total
 
 
 # =========================================
 # --- GENERADOR DE MÉTRICAS COMPLETAS ---
 # =========================================
 
-def generate_metrics(portfolio_values: pd.Series) -> dict:
+def generate_metrics(portfolio_values: pd.Series, pnl_history: list[float]) -> dict:
     """
     Calcula todas las métricas principales de desempeño.
 
@@ -84,7 +86,7 @@ def generate_metrics(portfolio_values: pd.Series) -> dict:
         "Sortino": annualized_sortino(mean, rets),
         "Calmar": annualized_calmar(mean, portfolio_values),
         "Max Drawdown": maximum_drawdown(portfolio_values),
-        "Win Rate": win_rate(rets),
+        "Win Rate": win_rate(pnl_history),
         "Mean Daily Return": mean,
         "Std Daily Return": std,
     }
