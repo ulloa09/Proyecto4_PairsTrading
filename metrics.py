@@ -4,14 +4,15 @@ import pandas as pd
 # ============================
 # --- MÉTRICAS DE DESEMPEÑO ---
 # ============================
+DAYS = 252
 
 def annualized_sharpe(mean: float, std: float) -> float:
     """
     Calcula el índice de Sharpe anualizado para datos diarios.
     Asume 252 días hábiles por año.
     """
-    annual_rets = mean * 252
-    annual_std = std * np.sqrt(252)
+    annual_rets = mean * DAYS
+    annual_std = std * np.sqrt(DAYS)
     return annual_rets / annual_std if annual_std > 0 else 0
 
 
@@ -28,7 +29,7 @@ def annualized_calmar(mean: float, values: pd.Series) -> float:
     """
     Calcula el índice de Calmar: retorno anualizado / máximo drawdown.
     """
-    annual_rets = mean * 252
+    annual_rets = mean * DAYS
     max_dd = maximum_drawdown(values)
     return annual_rets / max_dd if max_dd != 0 else 0
 
@@ -45,8 +46,8 @@ def annualized_sortino(mean: float, rets: pd.Series) -> float:
     """
     Calcula el índice de Sortino anualizado para datos diarios.
     """
-    annual_rets = mean * 252
-    annual_down_std = downside_deviation(rets) * np.sqrt(252)
+    annual_rets = mean * DAYS
+    annual_down_std = downside_deviation(rets) * np.sqrt(DAYS)
     return annual_rets / annual_down_std if annual_down_std > 0 else 0
 
 
@@ -87,5 +88,9 @@ def generate_metrics(portfolio_values: pd.Series) -> dict:
         "Mean Daily Return": mean,
         "Std Daily Return": std,
     }
+
+    print("\n--- MÉTRICAS DE DESEMPEÑO ---")
+    for k, v in metrics.items():
+        print(f"{k:20s}: {v:.4f}")
 
     return metrics
