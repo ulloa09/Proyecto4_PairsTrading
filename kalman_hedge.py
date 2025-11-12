@@ -22,7 +22,7 @@ class KalmanFilterReg:
         Initial covariance matrix (2x2).
     """
 
-    def __init__(self, q: float = 1e-5, r: float = 1e-2,
+    def __init__(self, q: float = 1e-5, r: float = 5e-3,
                  w_init=None, p_init=None):
         # Estado inicial (α_0, β_0)
         self.w = np.array([[0.0], [0.0]]) if w_init is None else w_init.reshape(-1, 1)

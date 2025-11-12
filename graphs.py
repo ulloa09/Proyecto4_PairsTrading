@@ -203,49 +203,67 @@ def plot_dynamic_eigenvectors(df):
 
 
 
-def plot_vecm_signals(df_kalman2, theta=1.8):
+def plot_vecm_signals(results_df: pd.DataFrame,
+                      entry_long_idx: list[int],
+                      entry_short_idx: list[int],
+                      exit_idx: list[int],
+                      theta: float):
     """
-    Grafica el Z-score del VECM y marca las señales de entrada/salida generadas por el filtro Kalman 2.
+    Grafica el VECM normalizado y marca las señales de entrada/salida generadas durante el backtest.
 
     Parámetros
     ----------
-    df_kalman2 : pd.DataFrame
-        DataFrame resultado del segundo filtro (con columnas 'vecm_t', 'z_t', 'signal_t').
+    results_df : pd.DataFrame
+        DataFrame con columna 'vecm_norm' e índice temporal.
+    entry_long_idx : list[int]
+        Índices (enteros) donde se abrieron operaciones LONG.
+    entry_short_idx : list[int]
+        Índices (enteros) donde se abrieron operaciones SHORT.
+    exit_idx : list[int]
+        Índices donde se cerraron operaciones.
     theta : float
-        Umbral usado para la generación de señales (default=1.8).
-
-    Retorna
-    -------
-    matplotlib.figure.Figure
-        Objeto de figura generado.
+        Umbral usado para la generación de señales.
     """
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(results_df.index, results_df["vecm_norm"],
+            color="steelblue", lw=1.4, label="VECM Normalizado")
 
-    # Serie principal del z-score
-    ax.plot(df_kalman2.index, df_kalman2["z_t"], color="steelblue", lw=1.5, label="Zₜ (VECM normalizado)")
-
-    # Bandas ±θ
-    ax.axhline(theta, color="red", linestyle="--", lw=1, label=f"+θ = {theta}")
-    ax.axhline(-theta, color="red", linestyle="--", lw=1, label=f"-θ = {-theta}")
+    # --- Líneas de umbral ---
+    ax.axhline(theta,  color="gray", linestyle="--", lw=1, label=f"+θ = {theta}")
+    ax.axhline(-theta, color="gray", linestyle="--", lw=1, label=f"-θ = {-theta}")
     ax.axhline(0, color="black", linestyle=":", lw=1)
 
-    # Señales: long (verde) y short (rojo)
-    long_signals = df_kalman2[df_kalman2["signal_t"] == 1]
-    short_signals = df_kalman2[df_kalman2["signal_t"] == -1]
+    # --- Mapeo de índices a fechas ---
+    def _idx_to_index_vals(idx_list, df_index):
+        return [df_index[i] for i in idx_list if 0 <= i < len(df_index)]
 
-    ax.scatter(long_signals.index, long_signals["z_t"],
-               color="green", s=35, marker="^", label="Entrada Long (+1)")
-    ax.scatter(short_signals.index, short_signals["z_t"],
-               color="darkred", s=35, marker="v", label="Entrada Short (−1)")
+    x_long  = _idx_to_index_vals(entry_long_idx,  results_df.index)
+    x_short = _idx_to_index_vals(entry_short_idx, results_df.index)
+    x_exit  = _idx_to_index_vals(exit_idx,        results_df.index)
 
-    # Personalización
-    ax.set_title("Z-score y Señales de Trading — VECM (Kalman 2)", fontsize=13, fontweight="bold")
+    y_long  = [results_df["vecm_norm"].iloc[i] for i in entry_long_idx  if 0 <= i < len(results_df)]
+    y_short = [results_df["vecm_norm"].iloc[i] for i in entry_short_idx if 0 <= i < len(results_df)]
+    y_exit  = [results_df["vecm_norm"].iloc[i] for i in exit_idx        if 0 <= i < len(results_df)]
+
+    # --- Puntos de señal ---
+    ax.scatter(x_long,  y_long,  color="green",  marker="^", s=90, label="Entrada LONG")
+    ax.scatter(x_short, y_short, color="red",    marker="v", s=90, label="Entrada SHORT")
+    ax.scatter(x_exit,  y_exit,  color="black",  marker="x", s=70, label="Cierre")
+
+    # --- Personalización ---
+    ax.set_title("Señales de Trading — VECM Normalizado (Kalman 2)", fontsize=13, fontweight="bold")
     ax.set_xlabel("Fecha", fontsize=11)
-    ax.set_ylabel("Zₜ (desviación estándar)", fontsize=11)
+    ax.set_ylabel("VECM Normalizado (z-score)", fontsize=11)
     ax.grid(alpha=0.3)
     ax.legend(frameon=False)
     plt.tight_layout()
+
+    try:
+        plt.gcf().autofmt_xdate()
+    except Exception:
+        pass
+
     plt.show()
 
 

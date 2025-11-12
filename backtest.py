@@ -6,7 +6,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 
 from functions import get_portfolio_value
-from graphs import plot_portfolio_evolution, plot_dynamic_eigenvectors
+from graphs import plot_portfolio_evolution, plot_dynamic_eigenvectors, plot_vecm_signals, plot_hedge_ratios
 from kalman_hedge import KalmanFilterReg
 from kalman_spread import KalmanFilterVecm
 from objects import Operation
@@ -37,11 +37,11 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Definir KALMANs
     # Kalman 1
-    kalman_1 = KalmanFilterReg(q=q, r=r)
+    kalman_1 = KalmanFilterReg()#q=q, r=r)
     hedge_ratio_list, spreads_list = [], []
 
     # Kalman 2
-    kalman_2 = KalmanFilterVecm(q=q, r=r)
+    kalman_2 = KalmanFilterVecm()#q=q, r=r)
     #v_prev = np.zeros(2)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
 
@@ -50,11 +50,11 @@ def backtest(df: pd.DataFrame, window_size:int,
         p2 = getattr(row, asset2)
 
         # ACTUALIZAR KALMAN 1
-        x_t = p1
-        y_t = p2
+        x_t = p2
+        y_t = p1
 
         kalman_1.predict()
-        alpha_t, beta_t, spread_t = kalman_1.update(x_t, y_t)
+        alpha_t, beta_t, spread_t = kalman_1.update(y_t, x_t)
         w0, w1 = alpha_t, beta_t
         hedge_ratio = w1  # <- hedge ratio (redundante)
 
@@ -70,14 +70,13 @@ def backtest(df: pd.DataFrame, window_size:int,
             v = eig.evec[:, 0].astype(float)
 
             e1, e2 = v
-
             # Precios originales sin centrar
             # 2️⃣ VECM observado con datos originales
-            vecm = e1 * x_t + e2 * y_t
+            vecm = e1 * y_t + e2 * x_t
 
             # 3️⃣ Actualizar Kalman 2 con precios y vecm observado
             kalman_2.predict()
-            e1_hat, e2_hat, vecm_hat = kalman_2.update(x_t, y_t, vecm)
+            e1_hat, e2_hat, vecm_hat = kalman_2.update(y_t, x_t, vecm)
 
             # Sin normalización del estado estimado
 
@@ -126,6 +125,8 @@ def backtest(df: pd.DataFrame, window_size:int,
             # ASSET2 es el activo caro, se hace SHORT
             n_shares_short = int(n_shares_long * abs(hedge_ratio))
             cost_short = p2 * n_shares_short * COM
+            print(f"P1: {p1}; P2: {p2}")
+            print(n_shares_long, costo, n_shares_short, p2 * n_shares_short)
 
             ## COMPRA DEL ACTIVO 1
             if available >= costo:
@@ -219,7 +220,7 @@ def backtest(df: pd.DataFrame, window_size:int,
         'e2_hat': e2_hat_list,
         'vecm_hat': vecms_hat_list,
         'hedge_ratio': hedge_ratio_list,
-        'vecm_norm': vecms_hatnorm_list
+        'vecm_norm': vecms_hatnorm_list,
     }, index=df.index[-len(e1_hat_list):])
 
     print(results_df.describe())
@@ -228,8 +229,10 @@ def backtest(df: pd.DataFrame, window_size:int,
     print(e2_hat_list[-10:])
     print(vecms_hat_list[-10:])
 
+    plt.plot(results_df.hedge_ratio, label='hedge ratio')
+    plt.show()
     plot_dynamic_eigenvectors(results_df)
-
+    plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx,theta)
 
     plt.figure(figsize=(10, 5))
     plt.plot(results_df["spread"], label="Spread (Kalman 1)")

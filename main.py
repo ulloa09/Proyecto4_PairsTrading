@@ -10,10 +10,10 @@ from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, 
 from utils import clean_prices, split_dfs, extract_pairs_all
 
 CORR_THRESHOLD = 0.6
-THETA = 2
-WINDOW = 20
+THETA = 0.5
+WINDOW = 50
 Q = 1e-7
-R = 3e-2
+R = 1e-3
 
 # Pre-processing data
 data = pd.read_csv('data/raw_prices.csv')
