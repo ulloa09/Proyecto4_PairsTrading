@@ -10,7 +10,7 @@ from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, 
 from utils import clean_prices, split_dfs
 
 CORR_THRESHOLD = 0.6
-THETA = 0.6
+THETA = 0.7
 WINDOW = 252
 Q = 1e-7
 R = 1e-3
