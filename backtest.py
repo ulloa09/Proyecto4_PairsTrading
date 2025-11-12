@@ -152,10 +152,10 @@ def backtest(df: pd.DataFrame, window_size:int,
             available = cash * 0.4
             # Ahora P1 es el activo caro, se hace SHORT
             n_shares_short = available // (p1 * (1+COM))
-            cost_short = n_shares_short * p1 * (1+COM)
+            cost_short = n_shares_short * p1 * (COM)
             # P2 es el activo barato, se hace LONG
             n_shares_long = int(n_shares_short * abs(hedge_ratio))
-            costo = p2 * n_shares_long * COM
+            costo = p2 * n_shares_long * (1+COM)
 
             ## COMPRA DEL ACTIVO 2
             if available >= costo:
