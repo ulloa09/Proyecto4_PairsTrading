@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 
 from backtest import backtest
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
-from utils import clean_prices, split_dfs
+from utils import clean_prices, split_dfs, show_cointegration_summary
 
 CORR_THRESHOLD = 0.6
 THETA = 0.7
@@ -26,7 +26,7 @@ correlated_pairs.to_csv('data/correlated_pairs.csv', index=False)
 ols_adf_results = ols_and_adf(train_df, correlated_pairs, save_path=f'data/results_ols_adf.csv')
 # Run Johansen test (solo para activos con residuos estacionarios)
 johansen_results = run_johansen_test(train_df, ols_adf_results, save_path=f'data/results_johansen.csv')
-
+show_cointegration_summary(ols_adf_results, johansen_results)
 
 # -- SELECCIÓN DEL PAR --
 # Obtain cointegrated pairs

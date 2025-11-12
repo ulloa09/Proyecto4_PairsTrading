@@ -62,3 +62,58 @@ def split_dfs(data: pd.DataFrame, train: int, test: int, validation: int) -> tup
     validation_df.to_csv('data/validation.csv')
 
     return train_df, test_df, validation_df
+
+import pandas as pd
+
+def show_cointegration_summary(adf_df: pd.DataFrame,
+                               johansen_df: pd.DataFrame,
+                               decimals: int = 4,
+                               save_csv: bool = True) -> pd.DataFrame:
+    """
+    Combina y muestra los resultados de las pruebas de cointegración (ADF + Johansen).
+
+    Parameters
+    ----------
+    adf_df : pd.DataFrame
+        DataFrame con resultados OLS + ADF.
+    johansen_df : pd.DataFrame
+        DataFrame con resultados de Johansen.
+    decimals : int, optional
+        Número de decimales para redondear los valores (por defecto 4).
+    save_csv : bool, optional
+        Si True, guarda la tabla combinada en 'data/summary_cointegration_table.csv'.
+
+    Returns
+    -------
+    pd.DataFrame
+        Tabla combinada con estadísticas de correlación y cointegración.
+    """
+
+    # Combinar los DataFrames por par de activos
+    merged = pd.merge(adf_df, johansen_df, on=['Asset_1', 'Asset_2'], how='left')
+
+    # Seleccionar columnas relevantes si existen
+    cols = [
+        'Asset_1', 'Asset_2', 'Mean_Correlation',
+        'beta1_OLS', 'ADF_stat', 'ADF_pvalue', 'Stationary',
+        'Trace_Stat', 'Crit_Value_5%', 'Rank_detected'
+    ]
+    existing_cols = [c for c in cols if c in merged.columns]
+    merged = merged[existing_cols]
+
+    # Redondear valores numéricos
+    merged = merged.round(decimals)
+
+    # Ordenar: primero pares cointegrados y luego por mayor correlación
+    if 'Stationary' in merged.columns and 'Mean_Correlation' in merged.columns:
+        merged = merged.sort_values(by=['Stationary'], ascending=[False])
+
+    # Mostrar tabla legible
+    print("\n=== Tabla resumen de correlaciones y cointegración ===\n")
+    print(merged.head(10))
+
+    # Guardar CSV opcional
+    if save_csv:
+        merged.to_csv('data/summary_cointegration_table.csv', index=False)
+
+    return merged
