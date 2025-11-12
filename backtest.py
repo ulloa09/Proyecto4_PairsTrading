@@ -1,13 +1,13 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.style.core import available
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 
 from functions import get_portfolio_value
-from graphs import plot_portfolio_evolution, plot_dynamic_eigenvectors, plot_vecm_signals, plot_hedge_ratios
+from graphs import plot_dynamic_eigenvectors, plot_vecm_signals
 from kalman_filters import KalmanFilterReg, KalmanFilterVecm
+from metrics import generate_metrics
 from objects import Operation
 
 
@@ -217,6 +217,7 @@ def backtest(df: pd.DataFrame, window_size:int,
         'vecm_hat': vecms_hat_list,
         'hedge_ratio': hedge_ratio_list,
         'vecm_norm': vecms_hatnorm_list,
+        'portfolio_value': portfolio_value,
     }, index=df.index[-len(e1_hat_list):])
 
     plot_dynamic_eigenvectors(results_df)
@@ -228,5 +229,13 @@ def backtest(df: pd.DataFrame, window_size:int,
     plt.title("Comparación Spread vs VECM estimado")
     plt.legend()
     plt.show()
+
+    portfolio_series = pd.Series(portfolio_value, index=df.index[-len(portfolio_value):])
+    metrics = generate_metrics(portfolio_series)
+
+    print("\n--- MÉTRICAS DE DESEMPEÑO ---")
+    for k, v in metrics.items():
+        print(f"{k:20s}: {v:.4f}")
+
 
     return cash, portfolio_value
