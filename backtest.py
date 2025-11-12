@@ -37,11 +37,11 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Definir KALMANs
     # Kalman 1
-    kalman_1 = KalmanFilterReg()#q=q, r=r)
+    kalman_1 = KalmanFilterReg(1e-6, 0.05)#q=q, r=r)
     hedge_ratio_list, spreads_list = [], []
 
     # Kalman 2
-    kalman_2 = KalmanFilterVecm()#q=q, r=r)
+    kalman_2 = KalmanFilterVecm(q=1e-7,r=0.3)#q=q, r=r)
     #v_prev = np.zeros(2)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
 
