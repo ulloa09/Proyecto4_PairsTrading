@@ -11,7 +11,7 @@ from utils import clean_prices, split_dfs
 
 CORR_THRESHOLD = 0.6
 THETA = 0.5
-WINDOW = 50
+WINDOW = 252
 Q = 1e-7
 R = 1e-3
 
