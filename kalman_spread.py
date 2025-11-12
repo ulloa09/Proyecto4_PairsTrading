@@ -8,7 +8,7 @@ class KalmanFilterVecm:
         ε_t = e1_t * p1_t + e2_t * p2_t + ν_t
     """
     def __init__(self, q=1e-6, r=2e-1):
-        self.w = np.array([[3.5,0.93]]).T
+        self.w = np.array([[-1,1]]).T
         self.P = np.eye(2)
         self.q = q
         self.r = r

@@ -52,7 +52,6 @@ def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float
 
     # === Filter pairs above the threshold ===
     high_corr_pairs = corr_df[corr_df["Mean_Correlation"] > threshold]
-    print(f"\nPairs with mean correlation > {threshold}:\n", high_corr_pairs.head(10))
 
 
     # === Guardar matriz completa de correlaciones móviles ===
@@ -224,7 +223,6 @@ def run_johansen_test(prices_df: pd.DataFrame, adf_results_df: pd.DataFrame,
     # Save results
     results_df = pd.DataFrame(results)
     results_df.to_csv(save_path, index=False)
-    print(f"\nJohansen results saved successfully at: {save_path}")
 
     return results_df
 
@@ -267,6 +265,5 @@ def extract_pair(prices_df: pd.DataFrame, johansen_df: pd.DataFrame,
     if save:
         filename = f"{path_prefix}{asset1}_{asset2}_pair.csv"
         df_pair.to_csv(filename)
-        print(f"💾 Saved pair to: {filename} with {len(df_pair)}")
 
     return df_pair

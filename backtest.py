@@ -15,6 +15,7 @@ from objects import Operation
 def backtest(df: pd.DataFrame, window_size:int,
              theta:float, q: float, r:float):
 
+
     # Copias por seguridad
     df = df.copy()
 
@@ -24,11 +25,12 @@ def backtest(df: pd.DataFrame, window_size:int,
     BORROW_RATE = 0.25/100 / DAYS
     cash = 1_000_000
 
+
+
     # Listas para almacenar
     portfolio_value = []
     active_long_ops: list[Operation] = []
     active_short_ops: list[Operation] = []
-    signals = []
     pnl_history = []
     entry_long_idx, entry_short_idx, exit_idx = [], [], []
 
@@ -42,8 +44,11 @@ def backtest(df: pd.DataFrame, window_size:int,
 
     # Kalman 2
     kalman_2 = KalmanFilterVecm(q=1e-7,r=0.3)#q=q, r=r)
-    #v_prev = np.zeros(2)
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []
+
+    print(f"\nIniciando backtesting con:")
+    print(f"Cash: {cash}")
+    print(f"Activo 1(y):{asset1}, Activo 2(x):{asset2}\n")
 
     for i, row in enumerate(df.itertuples(index=True)):
         p1 = getattr(row, asset1)
@@ -63,29 +68,22 @@ def backtest(df: pd.DataFrame, window_size:int,
 
         # ACTUALIZAR KALMAN 2
         if i > window_size:
-            # 1️⃣ Cointegración móvil
+            # Cointegración móvil
             window_data = df.iloc[i - window_size:i,:]
             eig = coint_johansen(window_data, det_order=0, k_ar_diff=1)
             # Eigenvector sin normalizar
             v = eig.evec[:, 0].astype(float)
-
             e1, e2 = v
-            # Precios originales sin centrar
-            # 2️⃣ VECM observado con datos originales
+            # VECM observado con datos originales
             vecm = e1 * y_t + e2 * x_t
-
-            # 3️⃣ Actualizar Kalman 2 con precios y vecm observado
+            # Actualizar Kalman 2 con precios y vecm observado
             kalman_2.predict()
             e1_hat, e2_hat, vecm_hat = kalman_2.update(y_t, x_t, vecm)
-
-            # Sin normalización del estado estimado
-
-            # 4️⃣ Guardar resultados
+            # Guardar resultados
             e1_hat_list.append(e1_hat)
             e2_hat_list.append(e2_hat)
             vecms_hat_list.append(vecm_hat)
-
-            # 5️⃣ Normalizar vecm_hat (solo si hay suficiente historia)
+            # Normalizar vecm_hat (solo si hay suficiente historia)
             if len(vecms_hat_list) > window_size:
                 vecms_sample = vecms_hat_list[-window_size:]
                 mu = np.mean(vecms_sample)
@@ -103,6 +101,42 @@ def backtest(df: pd.DataFrame, window_size:int,
             vecm_norm = 0.0
             vecms_hatnorm_list.append(0.0)
 
+        ## CERRAR OPERACIONES/POSICIONES
+        # LARGAS
+        for position in active_long_ops.copy():
+            if abs(vecm_norm) < 0.05:
+                exit_idx.append(i)
+                if position.ticker == asset1:
+                    pnl = (p1 - position.open_price)
+                    cash += p1 * position.n_shares * (1 - COM)
+                    position.close_price = p1
+                    pnl_history.append(pnl)
+                if position.ticker == asset2:
+                    pnl = (p2 - position.open_price)
+                    cash += p2 * position.n_shares * (1 - COM)
+                    position.close_price = p2
+                    pnl_history.append(pnl)
+                # Quitar posición porque ya se cerró
+                active_long_ops.remove(position)
+
+        for position in active_short_ops.copy():
+            if abs(vecm_norm) < 0.05:
+                exit_idx.append(i)
+                if position.ticker == asset1:
+                    pnl = (position.open_price - p1) * position.n_shares
+                    commission = p1 * position.n_shares * COM
+                    cash += pnl - commission
+                    position.close_price = p1
+                    pnl_history.append(pnl)
+
+                if position.ticker == asset2:
+                    pnl = (position.open_price - p2) * position.n_shares
+                    commission = p2 * position.n_shares * COM
+                    cash += pnl - commission
+                    position.close_price = p2
+                    pnl_history.append(pnl)
+                # Quitar posición porque ya se cerró
+                active_short_ops.remove(position)
 
         # COBRAR BORROW RATE PARA SHORTS DIARIO
         for position in active_short_ops.copy():
@@ -125,8 +159,6 @@ def backtest(df: pd.DataFrame, window_size:int,
             # ASSET2 es el activo caro, se hace SHORT
             n_shares_short = int(n_shares_long * abs(hedge_ratio))
             cost_short = p2 * n_shares_short * COM
-            print(f"P1: {p1}; P2: {p2}")
-            print(n_shares_long, costo, n_shares_short, p2 * n_shares_short)
 
             ## COMPRA DEL ACTIVO 1
             if available >= costo:
@@ -177,42 +209,7 @@ def backtest(df: pd.DataFrame, window_size:int,
 
 
 
-    ## CERRAR OPERACIONES/POSICIONES
-        # LARGAS
-        for position in active_long_ops.copy():
-            if abs(vecm_norm) < 0.05:
-                exit_idx.append(i)
-                if position.ticker == asset1:
-                    pnl = (p1 - position.open_price)
-                    cash += p1 * position.n_shares * (1-COM)
-                    position.close_price = p1
-                    pnl_history.append(pnl)
-                if position.ticker == asset2:
-                    pnl = (p2 - position.open_price)
-                    cash += p2 * position.n_shares * (1-COM)
-                    position.close_price = p2
-                    pnl_history.append(pnl)
-                # Quitar posición porque ya se cerró
-                active_long_ops.remove(position)
 
-        for position in active_short_ops.copy():
-            if abs(vecm_norm) < 0.05:
-                exit_idx.append(i)
-                if position.ticker == asset1:
-                    pnl = (position.open_price - p1) * position.n_shares
-                    commission = p1 * position.n_shares * COM
-                    cash += pnl - commission
-                    position.close_price = p1
-                    pnl_history.append(pnl)
-
-                if position.ticker == asset2:
-                    pnl = (position.open_price - p2) * position.n_shares
-                    commission = p2 * position.n_shares * COM
-                    cash += pnl - commission
-                    position.close_price = p2
-                    pnl_history.append(pnl)
-                #Quitar posición porque ya se cerró
-                active_short_ops.remove(position)
 
     results_df = pd.DataFrame({
         'spread': spreads_list,
@@ -223,14 +220,6 @@ def backtest(df: pd.DataFrame, window_size:int,
         'vecm_norm': vecms_hatnorm_list,
     }, index=df.index[-len(e1_hat_list):])
 
-    print(results_df.describe())
-
-    print(e1_hat_list[-10:])
-    print(e2_hat_list[-10:])
-    print(vecms_hat_list[-10:])
-
-    plt.plot(results_df.hedge_ratio, label='hedge ratio')
-    plt.show()
     plot_dynamic_eigenvectors(results_df)
     plot_vecm_signals(results_df, entry_long_idx, entry_short_idx, exit_idx,theta)
 
@@ -238,7 +227,7 @@ def backtest(df: pd.DataFrame, window_size:int,
     plt.plot(results_df["spread"], label="Spread (Kalman 1)")
     plt.plot(results_df["vecm_norm"], label="VECM (Kalman 2)", alpha=0.7)
     plt.title("Comparación Spread vs VECM estimado")
-    plt.legend();
+    plt.legend()
     plt.show()
 
     return cash, portfolio_value
