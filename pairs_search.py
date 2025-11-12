@@ -59,7 +59,7 @@ def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float
     corr_matrix = rolling_corr.groupby(level=1).mean()  # promedio por ticker global
     corr_matrix.to_csv("data/rolling_correlation_matrix.csv")
 
-    return high_corr_pairs
+    return corr_matrix, high_corr_pairs
 
 
 

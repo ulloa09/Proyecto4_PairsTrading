@@ -7,8 +7,7 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 from functions import get_portfolio_value
 from graphs import plot_portfolio_evolution, plot_dynamic_eigenvectors, plot_vecm_signals, plot_hedge_ratios
-from kalman_hedge import KalmanFilterReg
-from kalman_spread import KalmanFilterVecm
+from kalman_filters import KalmanFilterReg, KalmanFilterVecm
 from objects import Operation
 
 

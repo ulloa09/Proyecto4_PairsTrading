@@ -2,10 +2,6 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from backtest import backtest
-from graphs import plot_splits, plot_normalized_prices, plot_spreads, \
-    plot_hedge_ratios, plot_kalman_fits, plot_vecm_mean, plot_dynamic_eigenvectors, plot_vecm_signals
-from kalman_hedge import run_kalman_on_pair, KalmanFilterReg
-from kalman_spread import run_kalman2_vecm
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices, split_dfs
 
@@ -22,7 +18,7 @@ train_df, test_df, val_df = split_dfs(data, 60, 20, 20)
 
 
 # Encontrar pares correlacionados
-correlated_pairs = find_correlated_pairs(train_df, window=252, threshold=CORR_THRESHOLD)
+corr_matrix, correlated_pairs = find_correlated_pairs(train_df, window=252, threshold=CORR_THRESHOLD)
 correlated_pairs.to_csv('data/correlated_pairs.csv', index=False)
 
 # -- PRUEBAS DE COINTEGRACIÓN --
