@@ -2,7 +2,44 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import statsmodels.api as sm
 
+def plot_prices_and_spread(df):
+    """
+    Recibe un DataFrame con dos columnas de precios y grafica:
+    - Precios de ambos activos
+    - El spread basado en OLS (p1 - beta*p2)
+    """
+    # Extraer nombres
+    asset1, asset2 = df.columns[:2]
+    p1 = df[asset1]
+    p2 = df[asset2]
+
+    # Estimar hedge ratio con OLS
+    X = sm.add_constant(p2)
+    model = sm.OLS(p1, X).fit()
+    beta = model.params[asset2]
+
+    # Calcular spread
+    spread = p1 - beta * p2
+
+    # === Gráfica ===
+    fig, ax1 = plt.subplots(figsize=(14, 6))
+
+    # Precios
+    ax1.plot(df.index, p1, label=asset1, linewidth=1.5)
+    ax1.plot(df.index, p2, label=asset2, linewidth=1.5)
+    ax1.set_ylabel("Precio")
+    ax1.set_title(f"Precios vs Spread — Hedge Ratio β = {beta:.4f}")
+    ax1.legend(loc="upper left")
+
+    # Spread con eje secundario
+    ax2 = ax1.twinx()
+    ax2.plot(df.index, spread, color="black", linestyle="--", alpha=0.7, label="Spread")
+    ax2.set_ylabel("Spread")
+    ax2.legend(loc="upper right")
+
+    plt.show()
 
 def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"):
     """

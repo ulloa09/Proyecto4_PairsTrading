@@ -2,6 +2,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from backtest import backtest
+from graphs import plot_prices_and_spread
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices, split_dfs, show_cointegration_summary
 
