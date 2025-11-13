@@ -10,6 +10,8 @@ def plot_prices_and_spread(df):
     - Precios de ambos activos
     - El spread basado en OLS (p1 - beta*p2)
     """
+    df_norm = df / df.iloc[0]
+
     # Extraer nombres
     asset1, asset2 = df.columns[:2]
     p1 = df[asset1]
@@ -26,6 +28,9 @@ def plot_prices_and_spread(df):
     # === Gráfica ===
     fig, ax1 = plt.subplots(figsize=(14, 6))
 
+    p1 = df_norm[asset1]
+    p2 = df_norm[asset2]
+
     # Precios
     ax1.plot(df.index, p1, label=asset1, linewidth=1.5)
     ax1.plot(df.index, p2, label=asset2, linewidth=1.5)
@@ -35,9 +40,11 @@ def plot_prices_and_spread(df):
 
     # Spread con eje secundario
     ax2 = ax1.twinx()
-    ax2.plot(df.index, spread, color="black", linestyle="--", alpha=0.7, label="Spread")
+    ax2.plot(df.index, spread, color="black", linestyle="--", alpha=0.4, label="Spread")
     ax2.set_ylabel("Spread")
     ax2.legend(loc="upper right")
+
+    plt.grid(True, alpha=0.5)
 
     plt.show()
 
