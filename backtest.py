@@ -33,6 +33,8 @@ def backtest(df: pd.DataFrame, window_size:int,
     active_short_ops: list[Operation] = []
     pnl_history = []
     entry_long_idx, entry_short_idx, exit_idx = [], [], []
+    comisiones_totales = 0.0
+    borrows_totales = 0.0
 
     # Obtener nombres de activos
     asset1, asset2 = df.columns[:2]
@@ -101,6 +103,7 @@ def backtest(df: pd.DataFrame, window_size:int,
             vecm_norm = 0.0
             vecms_hatnorm_list.append(0.0)
 
+
         ## CERRAR OPERACIONES/POSICIONES
         # LARGAS
         for position in active_long_ops.copy():
@@ -146,6 +149,7 @@ def backtest(df: pd.DataFrame, window_size:int,
             elif position.type == 'short' and position.ticker == asset2:
                 borr_cost = p2 * position.n_shares * BORROW_RATE
                 cash -= borr_cost
+            borrows_totales += borr_cost
 
 
 
@@ -159,6 +163,8 @@ def backtest(df: pd.DataFrame, window_size:int,
             # ASSET2 es el activo caro, se hace SHORT
             n_shares_short = int(n_shares_long * abs(hedge_ratio))
             cost_short = p2 * n_shares_short * COM
+
+            comisiones_totales += cost_short + (n_shares_long * p1 * COM)
 
             ## COMPRA DEL ACTIVO 1
             if available >= costo:
@@ -188,6 +194,8 @@ def backtest(df: pd.DataFrame, window_size:int,
             # P2 es el activo barato, se hace LONG
             n_shares_long = int(n_shares_short * abs(hedge_ratio))
             costo = p2 * n_shares_long * (1+COM)
+
+            comisiones_totales += cost_short + (p2 * n_shares_long * COM)
 
             ## COMPRA DEL ACTIVO 2
             if available >= costo:
@@ -233,7 +241,7 @@ def backtest(df: pd.DataFrame, window_size:int,
     plot_spread_vs_vecm(results_df)
     plot_trade_returns_distribution(pnl_history)
 
-    metrics = generate_metrics(portfolio_series, pnl_history)
+    metrics = generate_metrics(portfolio_series, pnl_history, borrows_totales, comisiones_totales)
 
 
     return cash, portfolio_value, metrics

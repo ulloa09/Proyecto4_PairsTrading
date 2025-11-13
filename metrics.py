@@ -65,37 +65,59 @@ def win_rate(pnl_history: list[float]) -> float:
 # --- GENERADOR DE MÉTRICAS COMPLETAS ---
 # =========================================
 
-def generate_metrics(portfolio_values: pd.Series, pnl_history: list[float]) -> dict:
+def generate_metrics(portfolio_values: pd.Series,
+                     pnl_history: list[float],
+                     total_borrow_cost: float,
+                     total_commissions: float) -> dict:
     """
-    Calcula todas las métricas principales de desempeño.
+    Calcula todas las métricas completas de desempeño de la estrategia.
 
-    Parameters
-    ----------
-    portfolio_values : pd.Series
-        Serie temporal del valor del portafolio (diario).
-
-    Returns
-    -------
-    dict : métricas Sharpe, Sortino, Calmar, Drawdown y Win rate.
+    Esta versión agrega:
+    - Profit Factor
+    - Total Commissions
+    - Total Borrow Cost
+    (Sin modificar nada de lo que ya funcionaba)
     """
+
+    # --- Cálculo de retornos diarios ---
     rets = portfolio_values.pct_change().dropna()
     mean, std = rets.mean(), rets.std()
 
+    # --- Métricas principales ya existentes ---
+    sharpe = annualized_sharpe(mean, std)
+    sortino = annualized_sortino(mean, rets)
+    calmar = annualized_calmar(mean, portfolio_values)
+    max_dd = maximum_drawdown(portfolio_values)
+    wr = win_rate(pnl_history)
+
+    # --- Nuevas métricas ---
+    # Profit factor
+    pnl_array = np.array(pnl_history)
+    gains = pnl_array[pnl_array > 0].sum()
+    losses = abs(pnl_array[pnl_array < 0].sum())
+    profit_factor = gains / losses if losses > 0 else np.nan
+
+    # Diccionario final de métricas
     metrics = {
-        "Sharpe": annualized_sharpe(mean, std),
-        "Sortino": annualized_sortino(mean, rets),
-        "Calmar": annualized_calmar(mean, portfolio_values),
-        "Max Drawdown": maximum_drawdown(portfolio_values),
-        "Win Rate": win_rate(pnl_history),
+        "Sharpe": sharpe,
+        "Sortino": sortino,
+        "Calmar": calmar,
+        "Max Drawdown": max_dd,
+        "Win Rate": wr,
         "Mean Daily Return": mean,
         "Std Daily Return": std,
+        "Profit Factor": profit_factor,
+        "Total Commissions": total_commissions,
+        "Total Borrow Cost": total_borrow_cost
     }
-    abs = ["Sharpe", "Sortino", "Calmar"]
 
+    # --- Impresión bonita ---
     print("\n--- MÉTRICAS DE DESEMPEÑO ---")
     for k, v in metrics.items():
-        if k in abs:
-            print(f"{k:20s}: {v:.2f}")
+        if k in ["Sharpe", "Sortino", "Calmar", "Profit Factor"]:
+            print(f"{k:20s}: {v:.4f}")
+        elif k in ["Total Commissions", "Total Borrow Cost"]:
+            print(f"{k:20s}: ${v:,.2f}")
         else:
             print(f"{k:20s}: {v*100:.2f}%")
 

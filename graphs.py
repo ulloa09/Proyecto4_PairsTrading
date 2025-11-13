@@ -24,7 +24,7 @@ def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"
     normalized_df = df / df.iloc[0]
 
     # Graficar
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(12, 6))
     for col in normalized_df.columns:
         plt.plot(normalized_df.index, normalized_df[col], label=col)
 
@@ -36,7 +36,7 @@ def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"
     plt.show()
 
 def plot_dynamic_eigenvectors(df):
-    plt.figure(figsize=(10, 4))
+    plt.figure(figsize=(12, 6))
     plt.plot(df.index, df["e1_hat"], label="v₁ₜ", color='teal')
     plt.plot(df.index, df["e2_hat"], label="v₂ₜ", color='orange')
     plt.title("Eigenvectores dinámicos estimados (Kalman 2)")
@@ -129,7 +129,7 @@ def plot_spread_evolution(results_df: pd.DataFrame, asset1: str, asset2: str):
 
     spread_series = results_df["spread"]
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(12, 6))
     plt.plot(spread_series, color="steelblue", linewidth=1.8, label="Spread estimado (Kalman 1)", alpha = 0.6)
 
     # Media y desviación estándar
@@ -216,7 +216,7 @@ def plot_spread_vs_vecm(results_df: pd.DataFrame):
         if col not in results_df.columns:
             raise ValueError(f"Falta la columna requerida: '{col}' en results_df")
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(12, 6))
     plt.plot(results_df.index, results_df["spread"],
              color="steelblue", linewidth=1.8, label="Spread (Kalman 1)")
     plt.plot(results_df.index, results_df["vecm_norm"],
@@ -243,7 +243,7 @@ def plot_hedge_ratio_evolution(results_df: pd.DataFrame):
     if "hedge_ratio" not in results_df.columns:
         raise ValueError("La columna 'hedge_ratio' no existe en results_df.")
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(12, 6))
     plt.plot(results_df.index, results_df["hedge_ratio"],
              color="purple", linewidth=1.8, label="Razón de cobertura βₜ (Kalman 1)", alpha=0.8)
 
@@ -284,7 +284,7 @@ def plot_trade_returns_distribution(pnl_history: list[float]):
     win_rate = np.sum(pnl_array > 0) / len(pnl_array)
 
     # Crear histograma + densidad
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(12, 6))
     sns.histplot(pnl_array, bins=30, kde=True, color="steelblue", alpha=0.7)
 
     # Líneas de referencia
