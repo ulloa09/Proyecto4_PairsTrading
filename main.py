@@ -2,7 +2,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from backtest import backtest
-from graphs import plot_prices_and_spread
+from graphs import plot_spread_regression
 from pairs_search import find_correlated_pairs, ols_and_adf, run_johansen_test, extract_pair
 from utils import clean_prices, split_dfs, show_cointegration_summary
 
@@ -37,7 +37,7 @@ pair2_train_df = extract_pair(train_df, johansen_results, 1)
 pair2_test_df = extract_pair(test_df, johansen_results, 1)
 pair2_val_df = extract_pair(val_df, johansen_results, 1)
 
-
+plot_spread_regression(pair2_df)
 
 # BACKTESTING
 cash, port_value, metrics = backtest(pair2_df, window_size=WINDOW, theta=THETA, q=Q, r=R)

@@ -4,49 +4,44 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import statsmodels.api as sm
 
-def plot_prices_and_spread(df):
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+def plot_spread_regression(df: pd.DataFrame):
     """
-    Recibe un DataFrame con dos columnas de precios y grafica:
-    - Precios de ambos activos
-    - El spread basado en OLS (p1 - beta*p2)
+    Calcula y grafica el spread de una regresión OLS entre las dos
+    primeras columnas del DataFrame, sin mostrar precios.
+
+    Las columnas se interpretan como:
+        col0 -> activo dependiente (Y)
+        col1 -> activo independiente (X)
     """
-    df_norm = df / df.iloc[0]
 
-    # Extraer nombres
-    asset1, asset2 = df.columns[:2]
-    p1 = df[asset1]
-    p2 = df[asset2]
+    # Extraer automáticamente las columnas 1 y 2
+    col1 = df.columns[0]
+    col2 = df.columns[1]
 
-    # Estimar hedge ratio con OLS
-    X = sm.add_constant(p2)
-    model = sm.OLS(p1, X).fit()
-    beta = model.params[asset2]
+    # --- OLS ---
+    Y = df[col1].astype(float)
+    X = sm.add_constant(df[col2].astype(float))
+    model = sm.OLS(Y, X).fit()
+    alpha, beta = model.params
 
-    # Calcular spread
-    spread = p1 - beta * p2
+    # Spread = residuales del modelo
+    spread = model.resid
 
-    # === Gráfica ===
-    fig, ax1 = plt.subplots(figsize=(14, 6))
-
-    p1 = df_norm[asset1]
-    p2 = df_norm[asset2]
-
-    # Precios
-    ax1.plot(df.index, p1, label=asset1, linewidth=1.5)
-    ax1.plot(df.index, p2, label=asset2, linewidth=1.5)
-    ax1.set_ylabel("Precio")
-    ax1.set_title(f"Precios vs Spread — Hedge Ratio β = {beta:.4f}")
-    ax1.legend(loc="upper left")
-
-    # Spread con eje secundario
-    ax2 = ax1.twinx()
-    ax2.plot(df.index, spread, color="black", linestyle="--", alpha=0.4, label="Spread")
-    ax2.set_ylabel("Spread")
-    ax2.legend(loc="upper right")
-
-    plt.grid(True, alpha=0.5)
-
+    # --- Graficar spread ---
+    plt.figure(figsize=(12, 4))
+    plt.plot(spread, color="purple", linewidth=2)
+    plt.axhline(spread.mean(), color="black", linestyle="--", alpha=0.8)
+    plt.title(f"Spread from OLS Regression ({col1} ~ {col2})")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
     plt.show()
+
+    return
 
 def plot_normalized_prices(df: pd.DataFrame, title: str = "Precios normalizados"):
     """
