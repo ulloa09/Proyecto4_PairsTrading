@@ -37,7 +37,6 @@ pair2_train_df = extract_pair(train_df, johansen_results, 1)
 pair2_test_df = extract_pair(test_df, johansen_results, 1)
 pair2_val_df = extract_pair(val_df, johansen_results, 1)
 
-plot_spread_regression(pair2_df)
 
 # BACKTESTING
 cash, port_value, metrics = backtest(pair2_df, window_size=WINDOW, theta=THETA, q=Q, r=R)
