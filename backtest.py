@@ -103,9 +103,9 @@ def backtest(df: pd.DataFrame, window_size:int,
     e1_hat_list, e2_hat_list, vecms_hat_list, vecms_hatnorm_list = [], [], [], []  # Store VECM estimates
 
     # Print initial backtest configuration
-    print(f"\nIniciando backtesting con:")
+    print(f"\nStarting backtest:")
     print(f"Cash: {cash}")
-    print(f"Activo 1(y):{asset1}, Activo 2(x):{asset2}\n")
+    print(f"Asset 1 (y): {asset1}, Asset 2 (x): {asset2}\n")
 
     # Iterate over each row of price data for backtesting
     for i, row in enumerate(df.itertuples(index=True)):
@@ -250,7 +250,7 @@ def backtest(df: pd.DataFrame, window_size:int,
                                     close_price=0, date=row.Index)
                 active_long_ops.append(long_op)
 
-            # Execute short sell on asset2
+                # Execute short sell on asset2
                 cash -= cost_short  # Deduct commission cost only for short leg
                 short_op = Operation(ticker=asset2, type='short',
                                      n_shares=n_shares_short, open_price=p2,
@@ -283,7 +283,7 @@ def backtest(df: pd.DataFrame, window_size:int,
                                     close_price=0, date=row.Index)
                 active_long_ops.append(long_op)
 
-            # Execute short sell on asset1
+                # Execute short sell on asset1
                 cash -= cost_short  # Deduct commission cost only for short leg
                 short_op = Operation(ticker=asset1, type='short',
                                      n_shares=n_shares_short, open_price=p1,
