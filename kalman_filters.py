@@ -1,25 +1,54 @@
+"""
+Module for applying Kalman filters in the pairs trading project.
+
+This module implements two key Kalman filter models to support dynamic pairs trading strategies:
+1. Kalman Filter 1 (KalmanFilterReg): Estimates the dynamic hedge ratio between two cointegrated assets via a time-varying linear regression model.
+2. Kalman Filter 2 (KalmanFilterVecm and run_kalman2_vecm): Models the dynamic eigenvectors of a cointegration vector error correction model (VECM) with explicit stationary noise, enabling robust estimation of cointegration relationships over time.
+
+These filters facilitate sequential decision modeling by providing updated parameters and spread estimates, which can be integrated with backtesting frameworks to evaluate trading signals and strategy performance.
+
+The module supports loading price data, running the filters, and saving results for subsequent analysis.
+"""
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
 
 class KalmanFilterReg:
     """
-    Kalman filter for a dynamic linear regression:
-        y_t = α_t + β_t * x_t + v_t
-    with state evolution:
-        w_t = w_{t-1} + η_t
-    where w_t = [α_t, β_t]^T.
+    Kalman filter for dynamic linear regression modeling a time-varying hedge ratio.
+
+    The model assumes the observation equation:
+        y_t = α_t + β_t * x_t + v_t,
+    where v_t ~ N(0, r), and the state evolution:
+        w_t = w_{t-1} + η_t,
+    where w_t = [α_t, β_t]^T and η_t ~ N(0, q * I_2).
 
     Parameters
     ----------
     q : float
-        Process noise variance (Q = q * I_2).
+        Process noise variance (Q = q * I_2), controlling state evolution smoothness.
     r : float
-        Observation noise variance (R = r).
+        Observation noise variance (R = r), controlling measurement noise.
     w_init : np.ndarray, optional
-        Initial state vector [α_0, β_0].
+        Initial state vector of shape (2,) or (2,1), representing [α_0, β_0].
+        If None, initialized to zeros.
     p_init : np.ndarray, optional
-        Initial covariance matrix (2x2).
+        Initial state covariance matrix of shape (2, 2).
+        If None, initialized to identity matrix.
+
+    Attributes
+    ----------
+    w : np.ndarray
+        Current state estimate vector (2x1).
+    P : np.ndarray
+        Current state covariance matrix (2x2).
+    A : np.ndarray
+        State transition matrix (identity).
+    q : float
+        Process noise variance.
+    r : float
+        Observation noise variance.
     """
 
     def __init__(self, q: float = 1e-5, r: float = 5e-3,
@@ -35,14 +64,39 @@ class KalmanFilterReg:
         self.r = r
 
     def predict(self):
-        """Predicción del estado y su covarianza."""
+        """Perform the prediction step of the Kalman filter.
+
+        Propagates the state estimate and covariance forward one time step.
+
+        Updates
+        -------
+        self.w : np.ndarray
+            Predicted state estimate.
+        self.P : np.ndarray
+            Predicted state covariance.
+        """
         self.w = self.A @ self.w
         self.P = self.A @ self.P @ self.A.T + self.q * np.eye(2)
 
     def update(self, y_t: float, x_t: float):
         """
-        Actualiza el estado dado un nuevo par (x_t, y_t).
-        Devuelve la estimación instantánea (α_t, β_t) y el spread.
+        Perform the update step of the Kalman filter with a new observation.
+
+        Parameters
+        ----------
+        y_t : float
+            Observation at time t (dependent variable).
+        x_t : float
+            Predictor value at time t (independent variable).
+
+        Returns
+        -------
+        alpha_t : float
+            Estimated intercept at time t.
+        beta_t : float
+            Estimated slope (hedge ratio) at time t.
+        spread_t : float
+            Residual spread at time t: y_t - (alpha_t + beta_t * x_t).
         """
         # Vector de observación
         C_t = np.array([[1.0, x_t]])
@@ -66,10 +120,35 @@ class KalmanFilterReg:
 
 class KalmanFilterVecm:
     """
-    Kalman filter para la estimación dinámica de los eigenvectores (e1_t, e2_t)
-    del modelo cointegrante:
-        ε_t = e1_t * p1_t + e2_t * p2_t + ν_t
+    Kalman filter for dynamic estimation of eigenvectors in a cointegration VECM.
+
+    The observation model is:
+        ε_t = e1_t * p1_t + e2_t * p2_t + ν_t,
+    where ν_t ~ N(0, r), and the state vector w_t = [e1_t, e2_t]^T evolves as a random walk.
+
+    This model enables tracking time-varying cointegration eigenvectors with explicit stationary noise.
+
+    Parameters
+    ----------
+    q : float, optional
+        Process noise variance (default 1e-6).
+    r : float, optional
+        Observation noise variance (default 2e-1).
+
+    Attributes
+    ----------
+    w : np.ndarray
+        Current eigenvector estimate (2x1).
+    P : np.ndarray
+        Current covariance matrix (2x2).
+    A : np.ndarray
+        State transition matrix (identity).
+    q : float
+        Process noise variance.
+    r : float
+        Observation noise variance.
     """
+
     def __init__(self, q=1e-6, r=2e-1):
         self.w = np.array([[-1,1]]).T
         self.P = np.eye(2)
@@ -78,10 +157,35 @@ class KalmanFilterVecm:
         self.A = np.eye(2)
 
     def predict(self):
+        """Perform the prediction step of the Kalman filter.
+
+        Propagates the state estimate and covariance forward one time step.
+        """
         self.w = self.A @ self.w
         self.P = self.A @ self.P @ self.A.T + self.q * np.eye(2)
 
     def update(self, p1_t: float, p2_t: float, eps_t: float):
+        """
+        Perform the update step of the Kalman filter with a new observation.
+
+        Parameters
+        ----------
+        p1_t : float
+            Price of asset 1 at time t.
+        p2_t : float
+            Price of asset 2 at time t.
+        eps_t : float
+            Observed residual (spread) at time t.
+
+        Returns
+        -------
+        e1_t : float
+            Estimated eigenvector component for asset 1 at time t.
+        e2_t : float
+            Estimated eigenvector component for asset 2 at time t.
+        eps_hat_t : float
+            Estimated residual at time t based on current eigenvectors.
+        """
         # Vector de observación (precios)
         C_t = np.array([[p1_t, p2_t]])
         # Predicción del VECM
@@ -104,22 +208,31 @@ class KalmanFilterVecm:
 
 def run_kalman_on_pair(pair_df: pd.DataFrame, q: float = 1e-5, r: float = 1e-2):
     """
-    Ejecuta el primer filtro de Kalman sobre un par cointegrado.
+    Run the first Kalman filter (dynamic regression) on a cointegrated asset pair.
 
-    Parámetros
+    This function estimates the time-varying hedge ratio (alpha, beta) and spread
+    between two assets using a Kalman filter regression model.
+
+    Parameters
     ----------
-    csv_path : str
-        Ruta al archivo CSV con precios de dos activos (e.g. 'data/KO_DUK_pair.csv').
-    q, r : float
-        Parámetros de ruido de proceso y observación.
+    pair_df : pd.DataFrame
+        DataFrame containing price series of two assets as columns.
+    q : float, optional
+        Process noise variance for the Kalman filter (default 1e-5).
+    r : float, optional
+        Observation noise variance for the Kalman filter (default 1e-2).
 
-    Devuelve
-    --------
-    df_result : pd.DataFrame
-        DataFrame con columnas [Asset_1, Asset_2, alpha_t, beta_t, spread_t].
-    También guarda el resultado en data/kalman/kalman1_<Asset_1>_<Asset_2>.csv
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing the original prices, estimated alpha, beta,
+        predicted values, and spread residuals. Columns include:
+        [Asset_1, Asset_2, alpha, beta, y_pred, spread].
+
+    Notes
+    -----
+    The result is also saved to 'data/kalman/kalman1_<Asset_1>_<Asset_2>.csv'.
     """
-
     df = pair_df.copy()
     df.columns = [col.strip() for col in df.columns]  # limpieza ligera
     asset1, asset2 = df.columns[:2]
@@ -154,30 +267,40 @@ def run_kalman2_vecm(kalman1_df: pd.DataFrame,
                            theta: float = 1.8,
                            window: int = 100):
     """
-    Segundo filtro (2D con ruido estacionario explícito):
-    ε_t = [P1_t, P2_t]·v_t + ν_t,  con ν_t ~ N(0, r).
-    Esto permite que el VECM no colapse a 0, manteniendo estacionariedad con ruido.
+    Run the second Kalman filter for dynamic VECM eigenvector estimation with stationary noise.
 
-    Parámetros
+    This filter models the residual spread as a linear combination of asset prices with
+    time-varying eigenvectors, incorporating explicit stationary noise to prevent collapse.
+
+    Parameters
     ----------
-    kalman1_df : DataFrame
-        Salida del primer filtro (alpha, beta, etc.)
-    johansen_df : DataFrame
-        Con eigenvectores iniciales (Eigenvector_1, Eigenvector_2).
-    q, r : float
-        Ruido de proceso y de observación.
-    p0 : float
-        Covarianza inicial del estado.
-    theta : float
-        Umbral de señalización con z-score.
-    window : int
-        Ventana para normalización rolling.
+    kalman1_df : pd.DataFrame
+        Output DataFrame from the first Kalman filter containing alpha, beta, spread, etc.
+    johansen_df : pd.DataFrame
+        DataFrame containing initial eigenvectors for asset pairs with columns
+        ['Asset_1', 'Asset_2', 'Eigenvector_1', 'Eigenvector_2'].
+    q : float, optional
+        Process noise variance (default 1e-6).
+    r : float, optional
+        Observation noise variance (default 1e-2).
+    p0 : float, optional
+        Initial state covariance scalar (default 10.0).
+    theta : float, optional
+        Z-score threshold for signal generation (default 1.8).
+    window : int, optional
+        Rolling window size for z-score normalization (default 100).
 
-    Devuelve
-    --------
-    df_res : DataFrame con eigenvectores dinámicos, vecm_t, z_t, signal_t.
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame extending kalman1_df with columns:
+        ['v1_t', 'v2_t', 'vecm_t', 'z_t', 'signal_t'], representing dynamic eigenvectors,
+        estimated VECM residual, normalized z-score, and trading signals.
+
+    Notes
+    -----
+    The result is saved to 'data/kalman/kalman2_<Asset_1>_<Asset_2>.csv'.
     """
-
     # --- Identificación del par y precios ---
     asset1, asset2 = kalman1_df.columns[:2]
     p1 = kalman1_df[asset1].values.astype(float)
@@ -251,4 +374,3 @@ def run_kalman2_vecm(kalman1_df: pd.DataFrame,
     df_res.to_csv(output_path, index=True)
 
     return df_res
-
