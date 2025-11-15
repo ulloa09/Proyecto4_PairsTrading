@@ -1,3 +1,7 @@
+"""
+This module provides a comprehensive suite of plotting functions for visualizing key components of the Pairs Trading strategy. It includes tools for analyzing spreads derived from Ordinary Least Squares (OLS) regression and Kalman Filters, tracking dynamic hedge ratios, visualizing normalized price movements, and interpreting VECM-based trading signals. These visualizations support realistic research workflows by facilitating the assessment of model behavior, trade signals, portfolio evolution, and performance metrics within the Pairs Trading framework.
+"""
+
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -11,12 +15,22 @@ import statsmodels.api as sm
 
 def plot_spread_regression(df: pd.DataFrame):
     """
-    Computes and plots the spread from an OLS regression using the first
-    two columns of the DataFrame. Prices are not plotted.
+    Plot the residual spread from an Ordinary Least Squares (OLS) regression between two asset price series.
 
-    Columns are interpreted as:
-        col0 -> dependent asset (Y)
-        col1 -> independent asset (X)
+    This plot visualizes the spread (residuals) computed by regressing the dependent asset's price on the independent asset's price,
+    which is a foundational step in pairs trading strategies to identify mean-reverting relationships.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame containing at least two columns representing price series of two assets.
+        The first column is treated as the dependent variable (Y), and the second as the independent variable (X).
+
+    Notes
+    -----
+    - The spread is calculated as the residuals from the OLS regression (Y ~ X).
+    - Prices are not directly plotted; only the spread is shown.
+    - Useful for preliminary analysis before applying dynamic models such as Kalman Filters.
     """
     col1 = df.columns[0]
     col2 = df.columns[1]
@@ -42,16 +56,24 @@ def plot_spread_regression(df: pd.DataFrame):
 
 def plot_normalized_prices(df: pd.DataFrame, title: str = "Normalized Prices"):
     """
-    Plots normalized prices (base 1) of two assets to visualize crossovers.
+    Plot normalized price series of two assets to visualize relative movements and crossover points.
+
+    Normalization is performed by scaling each price series to start at 1, enabling direct comparison of relative price changes over time.
+    This visualization aids in identifying convergence or divergence patterns critical for pairs trading decisions.
 
     Parameters
     ----------
     df : pd.DataFrame
-        DataFrame indexed by dates with two price columns.
+        DataFrame indexed by dates containing exactly two columns of asset prices.
     title : str, optional
-        Plot title.
-    """
+        Title for the plot (default is "Normalized Prices").
 
+    Notes
+    -----
+    - The DataFrame index is converted to datetime if not already in datetime format.
+    - Normalization facilitates comparison by removing scale differences between assets.
+    - Useful for visual inspection of potential trading signals based on price crossovers.
+    """
     if not pd.api.types.is_datetime64_any_dtype(df.index):
         df.index = pd.to_datetime(df.index)
 
@@ -75,7 +97,20 @@ def plot_normalized_prices(df: pd.DataFrame, title: str = "Normalized Prices"):
 
 def plot_dynamic_eigenvectors(df: pd.DataFrame):
     """
-    Plots dynamic eigenvectors estimated by Kalman Filter 2.
+    Visualize the time evolution of dynamic eigenvectors estimated via Kalman Filter 2.
+
+    These eigenvectors represent time-varying components capturing the state dynamics in the pairs trading model,
+    providing insights into the changing relationships between assets.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame indexed by dates containing columns 'e1_hat' and 'e2_hat' representing the estimated eigenvectors.
+
+    Notes
+    -----
+    - The plot shows the trajectories of the first two eigenvectors over time.
+    - Useful for understanding model adaptation and dynamic factor behavior in real-time trading analysis.
     """
     plt.figure(figsize=(12, 6))
     plt.plot(df.index, df["e1_hat"], label="v₁ₜ", color='teal')
@@ -95,22 +130,29 @@ def plot_dynamic_eigenvectors(df: pd.DataFrame):
 
 def plot_vecm_signals(results_df: pd.DataFrame, entry_long_idx: list[int], entry_short_idx: list[int], exit_idx: list[int], theta: float):
     """
-    Plots normalized VECM values and marks long, short and exit trading signals.
+    Plot normalized VECM values with annotated trading signals indicating long entries, short entries, and exits.
+
+    This visualization helps in analyzing the timing and effectiveness of VECM-based trade signals within the pairs trading framework.
 
     Parameters
     ----------
     results_df : pd.DataFrame
-        Must contain 'vecm_norm'.
+        DataFrame indexed by dates containing a 'vecm_norm' column representing normalized VECM values (z-scores).
     entry_long_idx : list[int]
-        List of indices for LONG entries.
+        List of integer indices corresponding to long entry signal points.
     entry_short_idx : list[int]
-        List of indices for SHORT entries.
+        List of integer indices corresponding to short entry signal points.
     exit_idx : list[int]
-        List of indices for exits.
+        List of integer indices corresponding to exit signal points.
     theta : float
-        Threshold used for signal generation.
-    """
+        Threshold parameter used for generating trading signals.
 
+    Notes
+    -----
+    - The function converts integer indices to dates for plotting.
+    - Horizontal lines mark the positive and negative thresholds (+θ and -θ).
+    - Useful for backtesting and validating signal generation logic.
+    """
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(results_df.index, results_df["vecm_norm"], color="steelblue", lw=1.4,
             label="Normalized VECM (z-score)")
@@ -150,18 +192,25 @@ def plot_vecm_signals(results_df: pd.DataFrame, entry_long_idx: list[int], entry
 
 def plot_spread_evolution(results_df: pd.DataFrame, asset1: str, asset2: str):
     """
-    Plots the dynamic spread estimated by Kalman Filter 1.
+    Plot the dynamic spread estimated by Kalman Filter 1 between two assets over time.
+
+    The spread represents the residual between the dependent asset price and the dynamically weighted independent asset price,
+    reflecting the evolving relationship captured by the Kalman Filter.
 
     Parameters
     ----------
     results_df : pd.DataFrame
-        Must contain 'spread'.
+        DataFrame indexed by dates containing a 'spread' column representing the dynamic spread series.
     asset1 : str
-        Dependent asset name.
+        Name of the dependent asset.
     asset2 : str
-        Independent asset name.
-    """
+        Name of the independent asset.
 
+    Notes
+    -----
+    - The plot includes mean and ±1 and ±2 standard deviation bands to assess spread volatility.
+    - Visualizing spread dynamics is critical for identifying entry and exit points in pairs trading.
+    """
     spread_series = results_df["spread"]
 
     plt.figure(figsize=(12, 6))
@@ -202,17 +251,24 @@ def plot_spread_evolution(results_df: pd.DataFrame, asset1: str, asset2: str):
 
 def plot_portfolio_evolution(portfolio_series: pd.Series, split_ratios=(0.6, 0.2, 0.2)):
     """
-    Plots the evolution of the portfolio value highlighting training,
-    testing and validation phases (60%, 20%, 20%).
+    Plot the evolution of portfolio value over time, highlighting training, testing, and validation phases.
+
+    This visualization segments the portfolio timeline according to specified split ratios (default 60% train, 20% test, 20% validation),
+    facilitating performance assessment across different stages of model development and deployment.
 
     Parameters
     ----------
     portfolio_series : pd.Series
-        Time series of portfolio values.
-    split_ratios : tuple
-        Train, test, validation ratios.
-    """
+        Time series of portfolio values indexed by dates.
+    split_ratios : tuple, optional
+        Tuple of three floats representing the proportions for train, test, and validation splits respectively (default is (0.6, 0.2, 0.2)).
 
+    Notes
+    -----
+    - The function assumes the portfolio_series is ordered chronologically.
+    - Colored spans indicate the different phases for clarity.
+    - Useful for evaluating model robustness and overfitting risks.
+    """
     n = len(portfolio_series)
     train_end = int(n * split_ratios[0])
     test_end = int(n * (split_ratios[0] + split_ratios[1]))
@@ -243,7 +299,20 @@ def plot_portfolio_evolution(portfolio_series: pd.Series, split_ratios=(0.6, 0.2
 
 def plot_spread_vs_vecm(results_df: pd.DataFrame):
     """
-    Plots the spread (Kalman 1) compared to the normalized VECM (Kalman 2).
+    Compare the dynamic spread from Kalman Filter 1 with the normalized VECM values from Kalman Filter 2.
+
+    This plot facilitates side-by-side visual evaluation of two complementary model components,
+    aiding in understanding their interactions and relative behaviors in pairs trading.
+
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        DataFrame indexed by dates containing 'spread' and 'vecm_norm' columns.
+
+    Notes
+    -----
+    - Both time series are plotted on the same axes for direct comparison.
+    - Useful for diagnosing model consistency and signal alignment.
     """
     plt.figure(figsize=(12, 6))
     plt.plot(results_df.index, results_df["spread"], label="Spread (Kalman 1)")
@@ -265,14 +334,21 @@ def plot_spread_vs_vecm(results_df: pd.DataFrame):
 
 def plot_trade_returns_distribution(pnl_history: list[float]):
     """
-    Plots the distribution of trade PnL values and prints trading statistics.
+    Plot the distribution of trade profit and loss (PnL) values and print key trading performance statistics.
+
+    This visualization and summary provide insights into trade profitability, risk, and overall strategy effectiveness.
 
     Parameters
     ----------
-    pnl_history : list[float]
-        List of closed-trade PnL values.
-    """
+    pnl_history : list of float
+        List of closed-trade PnL values representing realized gains and losses.
 
+    Notes
+    -----
+    - If no trades are available, a warning message is printed and plotting is skipped.
+    - The histogram includes kernel density estimation (KDE) for smooth distribution representation.
+    - Printed statistics include number of trades, win rate, mean, median, standard deviation, average loss, and average gain.
+    """
     if not pnl_history:
         print("⚠️ No closed trades to analyze.")
         return
@@ -313,12 +389,25 @@ def plot_trade_returns_distribution(pnl_history: list[float]):
 
 def plot_hedge_ratio_evolution(results_df: pd.DataFrame):
     """
-    Plots the evolution of the hedge ratio estimated by Kalman Filter 1.
+    Plot the time evolution of the hedge ratio estimated by Kalman Filter 1.
+
+    The hedge ratio (βₜ) represents the dynamically estimated coefficient linking the prices of two assets,
+    crucial for constructing and adjusting pairs trading positions over time.
 
     Parameters
     ----------
     results_df : pd.DataFrame
-        Must contain column 'hedge_ratio'.
+        DataFrame indexed by dates containing a 'hedge_ratio' column.
+
+    Raises
+    ------
+    KeyError
+        If the 'hedge_ratio' column is not present in the DataFrame.
+
+    Notes
+    -----
+    - The plot includes the mean hedge ratio as a reference line.
+    - Monitoring hedge ratio dynamics helps in understanding model stability and market regime changes.
     """
     if "hedge_ratio" not in results_df.columns:
         raise KeyError("results_df must contain 'hedge_ratio' column")
