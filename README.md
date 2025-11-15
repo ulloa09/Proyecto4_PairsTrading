@@ -1,6 +1,6 @@
 # 004 - Pairs Trading
 
-## Mauricio Martíenez Ulloa
+## Mauricio Martínez Ulloa
 
 ## Project Overview
 
