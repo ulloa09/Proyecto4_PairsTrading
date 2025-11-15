@@ -121,4 +121,7 @@ def generate_metrics(portfolio_values: pd.Series,
         else:
             print(f"{k:20s}: {v*100:.2f}%")
 
+    metricas = pd.DataFrame(metrics, index=[0]).T
+    metricas.to_csv('data/metrics.csv')
+
     return metrics
