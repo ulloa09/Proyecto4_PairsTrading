@@ -1,3 +1,12 @@
+"""
+Module for identifying and analyzing pairs of financial assets suitable for pairs trading strategies.
+This module includes functions to find highly correlated asset pairs based on rolling correlations,
+perform statistical tests such as OLS regression and Augmented Dickey-Fuller (ADF) tests to assess
+cointegration, conduct Johansen cointegration tests to confirm long-term relationships, and extract
+aligned price data for selected pairs. The outputs facilitate the construction of pairs trading models
+by providing statistically validated pairs with estimated hedge ratios.
+"""
+
 import pandas as pd
 import statsmodels.api as sm
 import itertools
@@ -8,26 +17,28 @@ from statsmodels.tsa.vector_ar.vecm import coint_johansen
 
 def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float = 0.7) -> pd.DataFrame:
     """
-    Calculates rolling correlations between all asset pairs in the price DataFrame
-    and returns the pairs that exceed the average correlation threshold.
+    Compute rolling correlations between all pairs of assets in a price DataFrame and identify pairs
+    whose average rolling correlation exceeds a specified threshold.
 
     Parameters
     ----------
     data : pd.DataFrame
-        DataFrame containing asset prices. Must include a 'Date' column or a DateTime index.
+        DataFrame containing asset prices with either a 'Date' column or a DateTime index.
     window : int, optional
-        Window size for rolling correlation (default=60).
+        Window size for calculating rolling correlations, by default 60.
     threshold : float, optional
-        Minimum average correlation to consider a pair as a candidate (default=0.7).
+        Minimum average correlation required to consider a pair as correlated, by default 0.7.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with columns ['Asset_1', 'Asset_2', 'Mean_Correlation'],
-        sorted from highest to lowest average correlation.
+        The average rolling correlation matrix for all assets.
+    pd.DataFrame
+        DataFrame listing pairs with average correlation above the threshold, with columns:
+        ['Asset_1', 'Asset_2', 'Mean_Correlation'], sorted descending by correlation.
     """
 
-    # === Read and clean data ===
+    # === Prepare and clean data ===
     data = data.copy()
 
     # Ensure the index is datetime type and sorted
@@ -54,9 +65,9 @@ def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float
     high_corr_pairs = corr_df[corr_df["Mean_Correlation"] > threshold]
 
 
-    # === Guardar matriz completa de correlaciones móviles ===
-    rolling_corr = data.rolling(window).corr()       # devuelve panel largo (nivel MultiIndex)
-    corr_matrix = rolling_corr.groupby(level=1).mean()  # promedio por ticker global
+    # === Save full rolling correlation matrix ===
+    rolling_corr = data.rolling(window).corr()       # returns a long panel with MultiIndex
+    corr_matrix = rolling_corr.groupby(level=1).mean()  # average by ticker globally
     corr_matrix.to_csv("data/rolling_correlation_matrix.csv")
 
     return corr_matrix, high_corr_pairs
@@ -67,22 +78,24 @@ def find_correlated_pairs(data: pd.DataFrame, window: int = 60, threshold: float
 
 def ols_and_adf(prices: pd.DataFrame, correlated_pairs: pd.DataFrame, save_path: str = "data/ols_adf_results.csv") -> pd.DataFrame:
     """
-    Performs OLS regression and ADF test for all correlated pairs.
+    Perform Ordinary Least Squares (OLS) regression and Augmented Dickey-Fuller (ADF) tests on pairs
+    of assets identified as correlated, to evaluate stationarity of the spread and potential cointegration.
 
     Parameters
     ----------
-    prices_path : str
-        Path to the CSV file containing asset prices (Date column + tickers).
-    correlated_pairs_path : str
-        Path to the CSV file containing correlated pairs and Mean_Correlation.
+    prices : pd.DataFrame
+        DataFrame containing asset prices with a 'Date' column or DateTime index.
+    correlated_pairs : pd.DataFrame
+        DataFrame containing pairs of correlated assets with columns ['Asset_1', 'Asset_2', 'Mean_Correlation'].
     save_path : str, optional
-        Path to save results (default='data/ols_adf_results.csv').
+        File path to save the OLS and ADF test results CSV, by default 'data/ols_adf_results.csv'.
 
     Returns
     -------
     pd.DataFrame
-        Results DataFrame with columns:
-        ['Asset_1', 'Asset_2', 'beta1_OLS', 'ADF_stat', 'ADF_pvalue', 'n_obs', 'Mean_Correlation'].
+        DataFrame containing results for each pair with columns:
+        ['Asset_1', 'Asset_2', 'beta1_OLS', 'ADF_stat', 'ADF_pvalue', 'n_obs', 'Mean_Correlation', 'Stationary'].
+        'Stationary' indicates whether the residual spread is stationary at 95% confidence level.
     """
 
     # === Load input data ===
@@ -149,24 +162,26 @@ def ols_and_adf(prices: pd.DataFrame, correlated_pairs: pd.DataFrame, save_path:
 def run_johansen_test(prices_df: pd.DataFrame, adf_results_df: pd.DataFrame,
                       save_path: str = "data/results_johansen.csv") -> pd.DataFrame:
     """
-    Performs Johansen cointegration test for pairs that passed ADF (p < 0.05).
-    Saves trace statistics, 5% critical values, and first eigenvector (hedge ratio).
+    Conduct the Johansen cointegration test on asset pairs that passed the ADF stationarity test,
+    to determine the presence and rank of cointegration relationships and estimate hedge ratios.
 
     Parameters
     ----------
     prices_df : pd.DataFrame
-        DataFrame containing price data (Date index + tickers as columns).
+        DataFrame with price data indexed by Date and columns as asset tickers.
     adf_results_df : pd.DataFrame
-        DataFrame containing ADF test results (from results_ols_adf.csv).
+        DataFrame with ADF test results, including a 'Stationary' boolean column.
     save_path : str, optional
-        Path to save Johansen results CSV (default='data/results_johansen.csv').
+        File path to save Johansen test results CSV, by default 'data/results_johansen.csv'.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with columns:
-        ['Asset_1', 'Asset_2', 'Trace_Stat', 'Crit_Value_5%',
-         'Rank_detected', 'Eigenvector_1', 'Eigenvector_2']
+        DataFrame containing Johansen test results with columns:
+        ['Asset_1', 'Asset_2', 'Trace_Stat', 'Crit_Value_5%', 'Rank_detected',
+         'Eigenvector_1', 'Eigenvector_2', 'Cointegrated'].
+        'Rank_detected' indicates the cointegration rank (0 or 1),
+        and 'Cointegrated' is True if rank is 1.
     """
 
     # Filter only pairs that passed ADF (p < 0.05)
@@ -230,25 +245,26 @@ def run_johansen_test(prices_df: pd.DataFrame, adf_results_df: pd.DataFrame,
 def extract_pair(prices_df: pd.DataFrame, johansen_df: pd.DataFrame,
                                index: int, save: bool = True, path_prefix: str = "data/") -> pd.DataFrame:
     """
-    Extracts and saves a pair of assets based on its row index from the Johansen results DataFrame.
+    Extract the aligned price data for a specific asset pair identified by its index in the Johansen results,
+    optionally saving the extracted pair data to a CSV file.
 
     Parameters
     ----------
     prices_df : pd.DataFrame
-        DataFrame with price data (Date index + tickers as columns).
+        DataFrame containing price data indexed by Date with asset tickers as columns.
     johansen_df : pd.DataFrame
-        Full Johansen results DataFrame with columns ['Asset_1', 'Asset_2'].
+        DataFrame containing Johansen test results with columns ['Asset_1', 'Asset_2'].
     index : int
-        Row index in johansen_df indicating which pair to extract.
+        Row index in johansen_df specifying which asset pair to extract.
     save : bool, optional
-        Whether to save the pair CSV (default=True).
+        Whether to save the extracted pair data to a CSV file, by default True.
     path_prefix : str, optional
-        Folder path prefix for saving (default='data/').
+        Directory path prefix for saving the CSV file, by default 'data/'.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing ['Date', Asset_1, Asset_2'] with aligned and cleaned data.
+        DataFrame containing the aligned and cleaned price data for the selected asset pair.
     """
 
     prices_df = prices_df.copy()
